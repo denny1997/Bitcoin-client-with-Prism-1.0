@@ -25,21 +25,13 @@ impl MerkleTree {
                 hash_index.push(data[num-1].hash());
             }
             num = n.pow(p);
-        }
-        // if num % 2 > 0 {
-        //     hash_index.push(data[num-1].hash());
-        //     num = num + 1;
-        // }
+        }       
         while num > 1 {
             for i in 0..num/2 {
-                let mut d = vec![];
-                for j in &hash_index[base+i*2].0{
-                    d.push(*j);
-                }
-                for j in &hash_index[base+i*2+1].0{
-                    d.push(*j);
-                }      
-                hash_index.push((digest::digest(&digest::SHA256, &d[..])).into());      
+                let mut ctx = digest::Context::new(&digest::SHA256);
+                ctx.update(&<[u8;32]>::from(&hash_index[base+i*2]));
+                ctx.update(&<[u8;32]>::from(&hash_index[base+i*2+1]));
+                hash_index.push((ctx.finish()).into());
             }
             base = base + num;
             num = num/2;
@@ -95,26 +87,18 @@ pub fn verify(root: &H256, datum: &H256, proof: &[H256], index: usize, leaf_size
     let mut res: H256 = *datum;
     while pos > 1 {
         if pos % 2 ==0 {
-            let mut d = vec![];
-            for j in &proof[i].0{
-                d.push(*j);
-            }
-            for j in &res.0{
-                d.push(*j);
-            }      
-            i = i + 1;
-            res = (digest::digest(&digest::SHA256, &d[..])).into();      
+            let mut ctx = digest::Context::new(&digest::SHA256);
+            ctx.update(&<[u8;32]>::from(&proof[i]));
+            ctx.update(&<[u8;32]>::from(&res));
+            res = (ctx.finish()).into();
+            i = i + 1;             
         }
         else {
-            let mut d = vec![];
-            for j in &res.0{
-                d.push(*j);
-            }      
-            for j in &proof[i].0{
-                d.push(*j);
-            }
+            let mut ctx = digest::Context::new(&digest::SHA256);
+            ctx.update(&<[u8;32]>::from(&res));
+            ctx.update(&<[u8;32]>::from(&proof[i]));            
+            res = (ctx.finish()).into();
             i = i + 1;
-            res = (digest::digest(&digest::SHA256, &d[..])).into();      
         }
         pos = pos / 2;
     }
