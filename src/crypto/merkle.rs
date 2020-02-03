@@ -15,17 +15,20 @@ impl MerkleTree {
         for i in 0..num {
             hash_index.push(data[i].hash());
         }
-        let mut p = 1;
+        let mut p = 0;
         let n:usize = 2;
-        while n.pow(p)<num {
-            p+=1;
-        }
-        if n.pow(p)>num{
-            for i in num..n.pow(p) {
-                hash_index.push(data[num-1].hash());
+        while num > 1 {
+            if num % 2 == 1 {
+                let len = hash_index.len();
+                for k in len-n.pow(p)..len {
+                    hash_index.push(hash_index[k]);
+                num += 1;
+                }
             }
-            num = n.pow(p);
-        }       
+            num /= 2;
+            p += 1;
+        }
+        num = hash_index.len();
         while num > 1 {
             for i in 0..num/2 {
                 let mut ctx = digest::Context::new(&digest::SHA256);
@@ -121,6 +124,9 @@ mod tests {
             vec![
                 (hex!("0a0b0c0d0e0f0e0d0a0b0c0d0e0f0e0d0a0b0c0d0e0f0e0d0a0b0c0d0e0f0e0d")).into(),
                 (hex!("0101010101010101010101010101010101010101010101010101010101010202")).into(),
+                (hex!("0a0b0c0d0e0f0e0d0a0b0c0d0e0f0e0d0a0b0c0d0e0f0e0d0a0b0c0d0e0f0e0d")).into(),
+                (hex!("0a0b0c0d0e0f0e0d0a0b0c0d0e0f0e0d0a0b0c0d0e0f0e0d0a0b0c0d0e0f0e0d")).into(),
+                (hex!("0a0b0c0d0e0f0e0d0a0b0c0d0e0f0e0d0a0b0c0d0e0f0e0d0a0b0c0d0e0f0e0d")).into(),
             ]
         }};
     }
@@ -132,7 +138,8 @@ mod tests {
         let root = merkle_tree.root();
         assert_eq!(
             root,
-            (hex!("6b787718210e0b3b608814e04e61fde06d0df794319a12162f287412df3ec920")).into()
+            //(hex!("6b787718210e0b3b608814e04e61fde06d0df794319a12162f287412df3ec920")).into()
+            (hex!("f0de10bbc0838878b0c4175d9a9d900dc5fc26dfbc0bc182e629d197b3b32c5f")).into()
         );
         // "b69566be6e1720872f73651d1851a0eae0060a132cf0f64a0ffaea248de6cba0" is the hash of
         // "0a0b0c0d0e0f0e0d0a0b0c0d0e0f0e0d0a0b0c0d0e0f0e0d0a0b0c0d0e0f0e0d"
@@ -149,7 +156,9 @@ mod tests {
         let merkle_tree = MerkleTree::new(&input_data);
         let proof = merkle_tree.proof(0);
         assert_eq!(proof,
-                   vec![hex!("965b093a75a75895a351786dd7a188515173f6928a8af8c9baa4dcff268a4f0f").into()]
+                   vec![hex!("965b093a75a75895a351786dd7a188515173f6928a8af8c9baa4dcff268a4f0f").into(),
+                        hex!("8c56ff4c190d4f6cd98b87661e77da02ce4c1436de294382278bfb915c30576c").into(),
+                        hex!("7e85800ae9e1754abd05983bda78efa0834a16163927bef710cd7f49e315b58b").into()]                
         );
         // "965b093a75a75895a351786dd7a188515173f6928a8af8c9baa4dcff268a4f0f" is the hash of
         // "0101010101010101010101010101010101010101010101010101010101010202"
