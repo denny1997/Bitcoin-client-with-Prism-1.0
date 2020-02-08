@@ -1,8 +1,10 @@
 use serde::{Serialize,Deserialize};
 use ring::signature::{Ed25519KeyPair, Signature, KeyPair, VerificationAlgorithm, EdDSAParameters};
 use rand::Rng;
+use ring::digest;
+use crate::crypto::hash::{H256, Hashable};
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct Transaction {
     transaction: u8,
 }
@@ -19,6 +21,14 @@ pub fn verify(t: &Transaction, public_key: &<Ed25519KeyPair as KeyPair>::PublicK
     let encoded_struct: Vec<u8> = bincode::serialize(t).unwrap();
     let peer_public_key = ring::signature::UnparsedPublicKey::new(&ring::signature::ED25519, public_key);
     return peer_public_key.verify(&encoded_struct, signature.as_ref()).is_ok();    
+}
+
+impl Hashable for Transaction {
+    fn hash(&self) -> H256 {
+        let encoded_struct: Vec<u8> = bincode::serialize(&self).unwrap();
+        let hashed_struct = digest::digest(&digest::SHA256, &encoded_struct);
+        return hashed_struct.into();
+    }
 }
 
 #[cfg(any(test, test_utilities))]

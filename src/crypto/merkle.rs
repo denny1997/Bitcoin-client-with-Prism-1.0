@@ -49,9 +49,11 @@ impl MerkleTree {
     }
 
     pub fn root(&self) -> H256 {
+        if self.hash_idx.len() == 0{
+            return hex!("0000000000000000000000000000000000000000000000000000000000000000").into();
+        }
         return self.hash_idx[0];
     }
-
     /// Returns the Merkle Proof of data at index i
     pub fn proof(&self, index: usize) -> Vec<H256> {
         let mut res = vec![];
