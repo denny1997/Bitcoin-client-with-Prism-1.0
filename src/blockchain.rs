@@ -33,7 +33,7 @@ impl Blockchain {
         let h = self.height[&last];
         self.blocks.insert(block.hash(),Block{header:Header{parent:last,nonce:block.header.nonce,difficulty:block.header.difficulty,timestamp:block.header.timestamp,merkle_root:block.header.merkle_root},content:Content{data:(&block.content.data).to_vec()}});
         self.height.insert(block.hash(),h+1);
-        if(h+1>self.height[&self.last_block_of_longest_chain]){
+        if h+1 > self.height[&self.last_block_of_longest_chain] {
             self.last_block_of_longest_chain = block.hash();
         }
     }
@@ -48,7 +48,7 @@ impl Blockchain {
     pub fn all_blocks_in_longest_chain(&self) -> Vec<H256> {
         let mut blocks = vec![];
         let mut curBlock = self.last_block_of_longest_chain;
-        while (curBlock != self.genesis){
+        while curBlock != self.genesis {
             blocks.push(curBlock);
             curBlock = self.blocks[&curBlock].header.parent;
         }
