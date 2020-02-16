@@ -5,10 +5,10 @@ use crate::crypto::merkle::{MerkleTree};
 use crate::crypto::hash::Hashable;
 
 pub struct Blockchain {
-    blocks:HashMap<H256, Block>,
-    height:HashMap<H256, u32>,
-    last_block_of_longest_chain: H256,
-    genesis:H256
+    pub blocks:HashMap<H256, Block>,
+    pub height:HashMap<H256, u32>,
+    pub last_block_of_longest_chain: H256,
+    pub genesis:H256
 }
 
 impl Blockchain {
@@ -18,7 +18,11 @@ impl Blockchain {
         let mut height: HashMap<H256,u32> = HashMap::new();
         let data = vec![];
         let merkle_root = MerkleTree::new(&data).root();
-        let header:Header = Header{parent:merkle_root,nonce:0,difficulty:merkle_root,timestamp:0,merkle_root:merkle_root};
+        // let t1 = [255; 16];
+        // let t2 = [0; 8];
+        let mut difficulty: [u8; 32] = [0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1];
+        // difficulty.copy_from_slice(&([t2,t1].concat())[..]);
+        let header:Header = Header{parent:merkle_root,nonce:0,difficulty:difficulty.into(),timestamp:0,merkle_root:merkle_root};
         let content:Content = Content{data:data};
         let genesis: Block = Block{header: header, content: content};
         let hash = genesis.hash();

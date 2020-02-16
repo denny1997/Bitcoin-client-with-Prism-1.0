@@ -50,7 +50,7 @@ impl MerkleTree {
 
     pub fn root(&self) -> H256 {
         if self.hash_idx.len() == 0{
-            return hex!("0000000000000000000000000000000000000000000000000000000000000000").into();
+            return (b"00000000000000000000000000000000").into();
         }
         return self.hash_idx[0];
     }

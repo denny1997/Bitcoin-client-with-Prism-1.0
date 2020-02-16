@@ -7,6 +7,16 @@ use std::time;
 
 use std::thread;
 
+use std::sync::{Arc, Mutex};
+use crate::blockchain::Blockchain;
+use std::time::SystemTime;
+use crate::crypto::merkle::MerkleTree;
+use crate::crypto::hash::H256;
+use rand::Rng;
+use crate::transaction::Transaction;
+use crate::block::{Block,Header,Content};
+use crate::crypto::hash::Hashable;
+
 enum ControlSignal {
     Start(u64), // the number controls the lambda of interval between block generation
     Exit,
@@ -23,6 +33,7 @@ pub struct Context {
     control_chan: Receiver<ControlSignal>,
     operating_state: OperatingState,
     server: ServerHandle,
+    blockchain: Arc<Mutex<Blockchain>>,
 }
 
 #[derive(Clone)]
@@ -32,7 +43,7 @@ pub struct Handle {
 }
 
 pub fn new(
-    server: &ServerHandle,
+    server: &ServerHandle, blockchain: &Arc<Mutex<Blockchain>>
 ) -> (Context, Handle) {
     let (signal_chan_sender, signal_chan_receiver) = unbounded();
 
@@ -40,6 +51,7 @@ pub fn new(
         control_chan: signal_chan_receiver,
         operating_state: OperatingState::Paused,
         server: server.clone(),
+        blockchain: Arc::clone(blockchain),
     };
 
     let handle = Handle {
@@ -110,8 +122,30 @@ impl Context {
             if let OperatingState::ShutDown = self.operating_state {
                 return;
             }
-
+            
             // TODO: actual mining
+            let temp = Arc::clone(&self.blockchain);
+            //let mut blockchain = Arc::make_mut(&mut self.blockchain).lock().unwrap();
+            let mut blockchain = temp.lock().unwrap();
+            let parent = blockchain.tip();
+            //println!("{:?}", parent);
+            let timestamp:u128 = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
+            let difficulty = blockchain.blocks[&parent].header.difficulty;
+
+            let content:Vec<Transaction> = vec![];
+            let root = MerkleTree::new(&content).root();
+            let mut rng = rand::thread_rng();
+            let nonce: u32 = rng.gen();
+            let header:Header = Header{parent:parent,nonce:nonce,difficulty:difficulty,timestamp:timestamp,merkle_root:root};
+            let content:Content = Content{data:content};
+            let block: Block = Block{header: header, content: content};
+
+            if block.hash()<= difficulty {
+                //Arc::make_mut(&mut self.blockchain).get_mut().unwrap().insert(&block);
+                (*blockchain).insert(&block);
+                println!("{:?}", blockchain.blocks.len());
+                //self.blockchain = Arc::new(Mutex::new(blockchain));
+            }
 
             if let OperatingState::Run(i) = self.operating_state {
                 if i != 0 {
