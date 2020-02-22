@@ -62,6 +62,7 @@ fn main() {
 
     // create channels between server and worker
     let (msg_tx, msg_rx) = channel::unbounded();
+    let mut blockchain = Arc::new(Mutex::new(Blockchain::new()));
 
     // start the p2p server
     let (server_ctx, server) = server::new(p2p_addr, msg_tx).unwrap();
@@ -80,10 +81,9 @@ fn main() {
         p2p_workers,
         msg_rx,
         &server,
+        &blockchain,
     );
     worker_ctx.start();
-
-    let mut blockchain = Arc::new(Mutex::new(Blockchain::new()));
 
     // start the miner
     let (miner_ctx, miner) = miner::new(

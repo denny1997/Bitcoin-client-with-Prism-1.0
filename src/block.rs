@@ -5,7 +5,7 @@ use ring::digest;
 use rand::Rng;
 use crate::crypto::merkle::{MerkleTree};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Header {
     pub parent:H256,
     pub nonce:u32,
@@ -22,12 +22,12 @@ impl Hashable for Header {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Content {
     pub data:Vec<Transaction>
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Block {
     pub header:Header,
     pub content:Content,

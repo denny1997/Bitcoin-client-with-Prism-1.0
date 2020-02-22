@@ -16,6 +16,7 @@ use rand::Rng;
 use crate::transaction::Transaction;
 use crate::block::{Block,Header,Content};
 use crate::crypto::hash::Hashable;
+use crate::network::message::Message;
 
 enum ControlSignal {
     Start(u64), // the number controls the lambda of interval between block generation
@@ -143,6 +144,9 @@ impl Context {
             if block.hash()<= difficulty {
                 //Arc::make_mut(&mut self.blockchain).get_mut().unwrap().insert(&block);
                 (*blockchain).insert(&block);
+                let mut v = vec![];
+                v.push(block.hash());
+                self.server.broadcast(Message::NewBlockHashes(v));
                 println!("{:?}", blockchain.blocks.len());
                 //self.blockchain = Arc::new(Mutex::new(blockchain));
             }
