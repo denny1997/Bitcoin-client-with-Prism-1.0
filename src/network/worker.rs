@@ -73,9 +73,9 @@ impl Context {
                             h.push(hash);
                         }
                     }
-                    let ttt = h.clone();
+                    // let ttt = h.clone();
                     if h.len()>0{
-                        self.server.broadcast(Message::NewBlockHashes(ttt));
+                        // self.server.broadcast(Message::NewBlockHashes(ttt));
                         peer.write(Message::GetBlocks(h));
                     }
                 }
@@ -103,7 +103,7 @@ impl Context {
                     // peer.write(Message::Blocks(ttt));
                     debug!("Blocks");
                     let mut p = vec![];
-                    let mut broadcast_blocks = vec![];
+                    let mut broadcast_blocks_hashes = vec![];
                     for block in blocks {
                         if !blockchain.blocks.contains_key(&block.hash()) {
                             if !blockchain.blocks.contains_key(&block.header.parent){
@@ -112,13 +112,13 @@ impl Context {
                                 p.push(block.header.parent)
                             } else {
                                 (*blockchain).insert(&block);
-                                broadcast_blocks.push(block.clone());
+                                broadcast_blocks_hashes.push(block.clone().hash());
                                 let mut parent = block.hash();
                                 let mut temp;
                                 while self.buffer.contains_key(&parent) {
                                     println!("stucked! TAT");
                                     (*blockchain).insert(&self.buffer[&parent]); 
-                                    broadcast_blocks.push((self.buffer[&parent]).clone());                         
+                                    broadcast_blocks_hashes.push((self.buffer[&parent]).clone().hash());                         
                                     temp = self.buffer[&parent].hash();
                                     self.buffer.remove(&parent);
                                     parent = temp;
@@ -129,8 +129,8 @@ impl Context {
                     // if p.len() > 0 {
                     //     peer.write(Message::GetBlocks(p));
                     // }
-                    if broadcast_blocks.len() > 0 {
-                        self.server.broadcast(Message::Blocks(broadcast_blocks));
+                    if broadcast_blocks_hashes.len() > 0 {
+                        self.server.broadcast(Message::NewBlockHashes(broadcast_blocks_hashes));
                     }
                     println!("Blockchain length: {:?}", blockchain.blocks.len());
                     println!("Buffer length: {:?}", self.buffer.len());
