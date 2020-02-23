@@ -101,6 +101,7 @@ impl Context {
 
     fn miner_loop(&mut self) {
         // main mining loop
+        let mut counter = 0;
         loop {
             // check and react to control signals
             match self.operating_state {
@@ -147,7 +148,8 @@ impl Context {
                 let mut v = vec![];
                 v.push(block.hash());
                 self.server.broadcast(Message::NewBlockHashes(v));
-                println!("{:?}", blockchain.blocks.len());
+                counter += 1;
+                println!("!!!!!!!!!!!!!!!I did it! Counter: {:?}", counter);
                 //self.blockchain = Arc::new(Mutex::new(blockchain));
             }
 
