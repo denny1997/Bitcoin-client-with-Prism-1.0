@@ -105,26 +105,34 @@ impl Context {
                     let mut p = vec![];
                     let mut broadcast_blocks_hashes = vec![];
                     for block in blocks {
-                        if !blockchain.blocks.contains_key(&block.hash()) {
-                            if !blockchain.blocks.contains_key(&block.header.parent){
-                                self.buffer.insert(block.header.parent,block.clone());
-                                debug!("Parent not recieved yet");
-                                p.push(block.header.parent)
-                            } else {
-                                (*blockchain).insert(&block);
-                                broadcast_blocks_hashes.push(block.clone().hash());
-                                let mut parent = block.hash();
-                                let mut temp;
-                                while self.buffer.contains_key(&parent) {
-                                    println!("stucked! TAT");
-                                    (*blockchain).insert(&self.buffer[&parent]); 
-                                    broadcast_blocks_hashes.push((self.buffer[&parent]).clone().hash());                         
-                                    temp = self.buffer[&parent].hash();
-                                    self.buffer.remove(&parent);
-                                    parent = temp;
-                                }
-                            }                           
-                        }
+                        if block.header.difficulty >= block.hash() {
+                            if !blockchain.blocks.contains_key(&block.hash()) {
+                                if !blockchain.blocks.contains_key(&block.header.parent){                                   
+                                    self.buffer.insert(block.header.parent,block.clone());
+                                    debug!("Parent not recieved yet");
+                                    p.push(block.header.parent)                                                                     
+                                } else {
+                                    if block.header.difficulty == blockchain.blocks[&block.header.parent].header.difficulty {
+                                        (*blockchain).insert(&block);
+                                        broadcast_blocks_hashes.push(block.clone().hash());
+                                        let mut parent = block.hash();
+                                        let difficulty = block.header.difficulty;
+                                        let mut temp;
+                                        while self.buffer.contains_key(&parent) {
+                                            println!("stucked! TAT");
+                                            if self.buffer[&parent].header.difficulty != difficulty {
+                                                break;
+                                            }
+                                            (*blockchain).insert(&self.buffer[&parent]); 
+                                            broadcast_blocks_hashes.push((self.buffer[&parent]).clone().hash());                         
+                                            temp = self.buffer[&parent].hash();
+                                            self.buffer.remove(&parent);
+                                            parent = temp;
+                                        }
+                                    }
+                                }                           
+                            }
+                        }                       
                     }
                     // if p.len() > 0 {
                     //     peer.write(Message::GetBlocks(p));
