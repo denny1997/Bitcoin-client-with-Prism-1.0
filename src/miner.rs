@@ -145,11 +145,13 @@ impl Context {
             if block.hash()<= difficulty {
                 //Arc::make_mut(&mut self.blockchain).get_mut().unwrap().insert(&block);
                 (*blockchain).insert(&block);
+                let currentTime = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
+                let durationSinceMined = currentTime - block.header.timestamp;
                 let mut v = vec![];
                 v.push(block.hash());
                 self.server.broadcast(Message::NewBlockHashes(v));
                 counter += 1;
-                println!("!!!!!!!!!!!!!!!I did it! Counter: {:?}", counter);
+                println!("!!!!!!!!!!!!!!!I did it! Counter: {:?}, duration since mined: {:?}", counter, durationSinceMined);
                 //self.blockchain = Arc::new(Mutex::new(blockchain));
             }
 

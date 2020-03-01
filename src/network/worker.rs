@@ -8,7 +8,7 @@ use crate::blockchain::Blockchain;
 use crate::block::Block;
 use crate::crypto::hash::{Hashable,H256};
 use std::collections::HashMap;
-
+use std::time::SystemTime;
 use std::thread;
 
 #[derive(Clone)]
@@ -114,6 +114,9 @@ impl Context {
                                 } else {
                                     if block.header.difficulty == blockchain.blocks[&block.header.parent].header.difficulty {
                                         (*blockchain).insert(&block);
+                                        let currentTime = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
+                                        let durationSinceMined = currentTime - block.header.timestamp;
+                                        println!("!!!!!!!!!!!!!!!!!!!Latency: {:?}", durationSinceMined);
                                         broadcast_blocks_hashes.push(block.clone().hash());
                                         let mut parent = block.hash();
                                         let difficulty = block.header.difficulty;
