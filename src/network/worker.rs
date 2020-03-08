@@ -10,6 +10,7 @@ use crate::crypto::hash::{Hashable,H256};
 use std::collections::HashMap;
 use std::time::SystemTime;
 use std::thread;
+use ring::signature::{Signature, KeyPair};
 
 #[derive(Clone)]
 pub struct Context {
@@ -113,6 +114,15 @@ impl Context {
                                     p.push(block.header.parent)                                                                     
                                 } else {
                                     if block.header.difficulty == blockchain.blocks[&block.header.parent].header.difficulty {
+                                        let contents = block.content.data;
+                                        for signedTransaction in contents {
+                                            let signature: Signature = bincode::deserialize(&signedTransaction.signature[..]).unwrap();
+                                            let public_key: KeyPair::PublicKey = bincode::deserialize(&signedTransaction.public_key[..]).unwrap();
+                                            let transaction = signedTransaction.transaction;
+                                            if !verify(&transaction, &public_key, &signature) {
+                                                //break;
+                                            }
+                                        }
                                         (*blockchain).insert(&block);
                                         let currentTime = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
                                         let durationSinceMined = currentTime - block.header.timestamp;

@@ -13,7 +13,7 @@ use std::time::SystemTime;
 use crate::crypto::merkle::MerkleTree;
 use crate::crypto::hash::H256;
 use rand::Rng;
-use crate::transaction::Transaction;
+use crate::transaction::SignedTransaction;
 use crate::block::{Block,Header,Content};
 use crate::crypto::hash::Hashable;
 use crate::network::message::Message;
@@ -135,7 +135,7 @@ impl Context {
             let timestamp:u128 = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
             let difficulty = blockchain.blocks[&parent].header.difficulty;
 
-            let content:Vec<Transaction> = vec![];
+            let content:Vec<SignedTransaction> = vec![];
             let root = MerkleTree::new(&content).root();
             let mut rng = rand::thread_rng();
             let nonce: u32 = rng.gen();

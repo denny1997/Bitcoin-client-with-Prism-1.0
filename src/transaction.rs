@@ -3,10 +3,20 @@ use ring::signature::{Ed25519KeyPair, Signature, KeyPair, VerificationAlgorithm,
 use rand::Rng;
 use ring::digest;
 use crate::crypto::hash::{H256, Hashable};
+use crate::crypto::address::H160;
+
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct SignedTransaction {
+    pub signature: Vec<u8>,
+    pub public_key: Vec<u8>,
+    pub transaction: Transaction,
+}
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct Transaction {
-    transaction: u8,
+    pub recipientAddr: H160,
+    pub value: u32,
+    pub accountNonce: H160,
 }
 
 /// Create digital signature of a transaction
@@ -24,6 +34,14 @@ pub fn verify(t: &Transaction, public_key: &<Ed25519KeyPair as KeyPair>::PublicK
 }
 
 impl Hashable for Transaction {
+    fn hash(&self) -> H256 {
+        let encoded_struct: Vec<u8> = bincode::serialize(&self).unwrap();
+        let hashed_struct = digest::digest(&digest::SHA256, &encoded_struct);
+        return hashed_struct.into();
+    }
+}
+
+impl Hashable for SignedTransaction {
     fn hash(&self) -> H256 {
         let encoded_struct: Vec<u8> = bincode::serialize(&self).unwrap();
         let hashed_struct = digest::digest(&digest::SHA256, &encoded_struct);
