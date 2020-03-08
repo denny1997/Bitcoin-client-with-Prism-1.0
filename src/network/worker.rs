@@ -10,7 +10,8 @@ use crate::crypto::hash::{Hashable,H256};
 use std::collections::HashMap;
 use std::time::SystemTime;
 use std::thread;
-use ring::signature::{Signature, KeyPair};
+use ring::signature::{Signature, KeyPair, Ed25519KeyPair};
+use crate::transaction::verify;
 
 #[derive(Clone)]
 pub struct Context {
@@ -114,14 +115,23 @@ impl Context {
                                     p.push(block.header.parent)                                                                     
                                 } else {
                                     if block.header.difficulty == blockchain.blocks[&block.header.parent].header.difficulty {
-                                        let contents = block.content.data;
+                                        let contents = &(&block.clone()).content.data;
+                                        let mut flag = false;
                                         for signedTransaction in contents {
-                                            let signature: Signature = bincode::deserialize(&signedTransaction.signature[..]).unwrap();
-                                            let public_key: KeyPair::PublicKey = bincode::deserialize(&signedTransaction.public_key[..]).unwrap();
-                                            let transaction = signedTransaction.transaction;
-                                            if !verify(&transaction, &public_key, &signature) {
-                                                //break;
+                                            // let signature: Signature = bincode::deserialize(&signedTransaction.signature[..]).unwrap();
+                                            // let public_key = ring::signature::UnparsedPublicKey::new(&signature::ED25519, signedTransaction.public_key);
+                                            // bincode::deserialize(&signedTransaction.public_key[..]).unwrap();
+                                            // let transaction = signedTransaction.transaction;
+                                            let signature = &signedTransaction.signature;
+                                            let public_key = &signedTransaction.public_key;
+                                            let transaction = &signedTransaction.transaction;
+                                            if !verify(transaction, public_key, signature) {
+                                                flag = true;    // invalid signature
+                                                break;
                                             }
+                                        }
+                                        if flag {
+                                            break;
                                         }
                                         (*blockchain).insert(&block);
                                         let currentTime = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
@@ -136,6 +146,25 @@ impl Context {
                                             if self.buffer[&parent].header.difficulty != difficulty {
                                                 break;
                                             }
+                                            let contents = &(self.buffer[&parent].clone()).content.data;
+                                            let mut flag = false;
+                                            for signedTransaction in contents {
+                                                // let signature: Signature = bincode::deserialize(&signedTransaction.signature[..]).unwrap();
+                                                // let public_key = ring::signature::UnparsedPublicKey::new(&signature::ED25519, signedTransaction.public_key);
+                                                // bincode::deserialize(&signedTransaction.public_key[..]).unwrap();
+                                                // let transaction = signedTransaction.transaction;
+                                                let signature = &signedTransaction.signature;
+                                                let public_key = &signedTransaction.public_key;
+                                                let transaction = &signedTransaction.transaction;
+                                                if !verify(transaction, public_key, signature) {
+                                                    flag = true;    // invalid signature
+                                                    break;
+                                                }
+                                            }
+                                            if flag {
+                                                break;
+                                            }
+
                                             (*blockchain).insert(&self.buffer[&parent]); 
                                             broadcast_blocks_hashes.push((self.buffer[&parent]).clone().hash());                         
                                             temp = self.buffer[&parent].hash();

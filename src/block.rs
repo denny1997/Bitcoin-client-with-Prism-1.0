@@ -47,7 +47,7 @@ pub mod test {
     pub fn generate_random_block(parent: &H256) -> Block {
         let mut rng = rand::thread_rng();
         let n1: u32 = rng.gen();
-        let n2: u64 = rng.gen();
+        let n2: u128 = rng.gen();
         let data = vec![];
         let merkle_root = MerkleTree::new(&data).root();
         let header:Header = Header{parent:*parent,nonce:n1,difficulty:*parent,timestamp:n2,merkle_root:merkle_root};

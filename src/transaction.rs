@@ -16,7 +16,7 @@ pub struct SignedTransaction {
 pub struct Transaction {
     pub recipientAddr: H160,
     pub value: u32,
-    pub accountNonce: H160,
+    pub accountNonce: u32,
 }
 
 /// Create digital signature of a transaction
@@ -27,10 +27,11 @@ pub fn sign(t: &Transaction, key: &Ed25519KeyPair) -> Signature {
 }
 
 /// Verify digital signature of a transaction, using public key instead of secret key
-pub fn verify(t: &Transaction, public_key: &<Ed25519KeyPair as KeyPair>::PublicKey, signature: &Signature) -> bool {
+// 
+pub fn verify(t: &Transaction, public_key: &[u8], signature: &[u8]) -> bool {
     let encoded_struct: Vec<u8> = bincode::serialize(t).unwrap();
     let peer_public_key = ring::signature::UnparsedPublicKey::new(&ring::signature::ED25519, public_key);
-    return peer_public_key.verify(&encoded_struct, signature.as_ref()).is_ok();    
+    return peer_public_key.verify(&encoded_struct, signature).is_ok();    
 }
 
 impl Hashable for Transaction {
@@ -66,6 +67,6 @@ mod tests {
         let t = generate_random_transaction();
         let key = key_pair::random();
         let signature = sign(&t, &key);
-        assert!(verify(&t, &(key.public_key()), &signature));
+        assert!(verify(&t, &(key.public_key()), &signature.as_ref()));
     }
 }
