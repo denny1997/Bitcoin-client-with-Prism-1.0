@@ -1,7 +1,7 @@
 use serde::{Serialize, Deserialize};
 use crate::crypto::hash::H256;
 use crate::block::Block;
-use crate::transaction::Transaction;
+use crate::transaction::SignedTransaction;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Message {
@@ -10,7 +10,7 @@ pub enum Message {
     NewBlockHashes(Vec<H256>),
     GetBlocks(Vec<H256>),
     Blocks(Vec<Block>),
-    // NewTransactionHashes(Vec<H256>),
-    // GetTransactions(Vec<H256>),
-    // Transactions(Vec<Transaction>),
+    NewTransactionHashes(Vec<H256>),
+    GetTransactions(Vec<H256>),
+    Transactions(Vec<SignedTransaction>),
 }

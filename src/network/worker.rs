@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::time::SystemTime;
 use std::thread;
 use ring::signature::{Signature, KeyPair, Ed25519KeyPair};
-use crate::transaction::verify;
+use crate::transaction::{verify,Mempool};
 
 #[derive(Clone)]
 pub struct Context {
@@ -20,6 +20,7 @@ pub struct Context {
     server: ServerHandle,
     blockchain: Arc<Mutex<Blockchain>>,
     buffer: HashMap<H256, Block>,
+    mempool: Arc<Mutex<Mempool>>,
 }
 
 pub fn new(
@@ -27,6 +28,7 @@ pub fn new(
     msg_src: channel::Receiver<(Vec<u8>, peer::Handle)>,
     server: &ServerHandle,
     blockchain: &Arc<Mutex<Blockchain>>,
+    mempool: &Arc<Mutex<Mempool>>,
 ) -> Context {
     Context {
         msg_chan: msg_src,
@@ -34,6 +36,7 @@ pub fn new(
         server: server.clone(),
         blockchain: Arc::clone(blockchain),
         buffer: HashMap::new(),
+        mempool: Arc::clone(mempool),
     }
 }
 
@@ -57,6 +60,9 @@ impl Context {
             // println!("1");
             let mut blockchain = temp.lock().unwrap();
             // println!("2");
+            let temp_mempool = Arc::clone(&self.mempool);
+            let mut mempool = temp_mempool.lock().unwrap();
+
             let (msg, peer) = msg;
             let msg: Message = bincode::deserialize(&msg).unwrap();
             match msg {
@@ -66,6 +72,48 @@ impl Context {
                 }
                 Message::Pong(nonce) => {
                     debug!("Pong: {}", nonce);
+                }
+                Message::NewTransactionHashes(hashes) => {
+                    debug!("NewTransactionHashes");
+                    let mut h = vec![];
+                    for hash in hashes {
+                        if !mempool.transactions.contains_key(&hash) {
+                            h.push(hash);
+                        }
+                    }
+                    if h.len()>0{
+                        peer.write(Message::GetTransactions(h));
+                    }
+                }
+                Message::GetTransactions(hashes) => {
+                    debug!("GetTransactions");
+                    let mut b = vec![];
+                    for hash in hashes {
+                        if mempool.transactions.contains_key(&hash) {
+                            b.push(mempool.transactions[&hash].clone());
+                        }
+                    }
+                    if b.len()>0{
+                        peer.write(Message::Transactions(b));
+                    }                   
+                }
+                Message::Transactions(transactions) => {
+                    debug!("Transactions");
+                    let mut broadcast_transactions_hashes = vec![];
+                    for transaction in transactions {
+                        if !mempool.transactions.contains_key(&transaction.hash()) {                           
+                            let signature = &transaction.signature;
+                            let public_key = &transaction.public_key;
+                            let transaction_content = &transaction.transaction;
+                            if verify(transaction_content, public_key, signature) {
+                                (*mempool).insert(&transaction);
+                                broadcast_transactions_hashes.push(transaction.clone().hash());
+                            }                                                        
+                        }                                              
+                    }
+                    if broadcast_transactions_hashes.len() > 0 {
+                        self.server.broadcast(Message::NewTransactionHashes(broadcast_transactions_hashes));
+                    }
                 }
                 Message::NewBlockHashes(hashes) => {
                     debug!("NewBlockHashes");

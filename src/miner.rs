@@ -9,6 +9,7 @@ use std::thread;
 
 use std::sync::{Arc, Mutex};
 use crate::blockchain::Blockchain;
+use crate::transaction::Mempool;
 use std::time::SystemTime;
 use crate::crypto::merkle::MerkleTree;
 use crate::crypto::hash::H256;
@@ -36,6 +37,7 @@ pub struct Context {
     operating_state: OperatingState,
     server: ServerHandle,
     blockchain: Arc<Mutex<Blockchain>>,
+    mempool: Arc<Mutex<Mempool>>,
 }
 
 #[derive(Clone)]
@@ -45,7 +47,7 @@ pub struct Handle {
 }
 
 pub fn new(
-    server: &ServerHandle, blockchain: &Arc<Mutex<Blockchain>>
+    server: &ServerHandle, blockchain: &Arc<Mutex<Blockchain>>, mempool: &Arc<Mutex<Mempool>>
 ) -> (Context, Handle) {
     let (signal_chan_sender, signal_chan_receiver) = unbounded();
 
@@ -54,6 +56,7 @@ pub fn new(
         operating_state: OperatingState::Paused,
         server: server.clone(),
         blockchain: Arc::clone(blockchain),
+        mempool: Arc::clone(mempool),
     };
 
     let handle = Handle {
@@ -130,12 +133,29 @@ impl Context {
             let temp = Arc::clone(&self.blockchain);
             //let mut blockchain = Arc::make_mut(&mut self.blockchain).lock().unwrap();
             let mut blockchain = temp.lock().unwrap();
+            let temp_mempool = Arc::clone(&self.mempool);
+            let mut mempool = temp_mempool.lock().unwrap();
             let parent = blockchain.tip();
             //println!("{:?}", parent);
             let timestamp:u128 = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
             let difficulty = blockchain.blocks[&parent].header.difficulty;
 
-            let content:Vec<SignedTransaction> = vec![];
+            let mut content:Vec<SignedTransaction> = vec![];
+            if mempool.transactions.len() <= 64 {
+                for (h, t) in mempool.transactions.iter() {
+                    content.push((*t).clone());
+                }
+            } else {
+                let mut num = 0;
+                for (h, t) in mempool.clone().transactions.iter() {
+                    content.push((*t).clone());
+                    (*mempool).transactions.remove(h);
+                    num += 1;
+                    if num == 64 {
+                        break;
+                    }
+                }
+            }
             let root = MerkleTree::new(&content).root();
             let mut rng = rand::thread_rng();
             let nonce: u32 = rng.gen();

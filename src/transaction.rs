@@ -4,6 +4,23 @@ use rand::Rng;
 use ring::digest;
 use crate::crypto::hash::{H256, Hashable};
 use crate::crypto::address::H160;
+use std::collections::HashMap;
+
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct Mempool {
+    pub transactions: HashMap<H256,SignedTransaction>,
+}
+
+impl Mempool {
+    pub fn new() -> Self {
+        let mut transactions: HashMap<H256,SignedTransaction> = HashMap::new();
+        return Mempool{transactions:transactions};
+    }
+
+    pub fn insert(&mut self, transaction: &SignedTransaction) {
+        self.transactions.insert(transaction.hash(),transaction.clone());
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct SignedTransaction {
