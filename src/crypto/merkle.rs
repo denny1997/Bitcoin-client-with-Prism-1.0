@@ -9,43 +9,114 @@ pub struct MerkleTree {
 
 impl MerkleTree {
     pub fn new<T>(data: &[T]) -> Self where T: Hashable, {
-        let mut hash_index = vec![];
-        let mut num = data.len();
-        let mut base = 0;
-        for i in 0..num {
-            hash_index.push(data[i].hash());
+        let leaf_size = data.len();
+        // let mut temp: Vec<MerkleNode> = [].to_vec();
+        let mut temp: Vec<H256> = [].to_vec();
+        // let mut high: Vec<MerkleNode> = [].to_vec();
+        if leaf_size == 0{
+            let fake_data: H256 = (b"00000000000000000000000000000000").into();
+            temp.push(fake_data);
         }
-        let mut p = 0;
-        let n:usize = 2;
-        while num > 1 {
-            if num % 2 == 1 {
-                let len = hash_index.len();
-                for k in len-n.pow(p)..len {
-                    hash_index.push(hash_index[k]);
-                num += 1;
+        else if leaf_size == 1 {
+            temp.push(data[0].hash());
+        }
+        else{
+            for count in 0..leaf_size {
+                // temp.push(MerkleNode{value: data[count].hash(), l: None, r: None});
+                temp.push(data[count].hash());
+            }
+            // duplicate
+            let mut count = 1usize;
+            loop{
+                if count < leaf_size{
+                    count *= 2;
+                }
+                else{
+                    break;
                 }
             }
-            num /= 2;
-            p += 1;
-        }
-        num = hash_index.len();
-        while num > 1 {
-            for i in 0..num/2 {
-                let mut ctx = digest::Context::new(&digest::SHA256);
-                ctx.update(&<[u8;32]>::from(&hash_index[base+i*2]));
-                ctx.update(&<[u8;32]>::from(&hash_index[base+i*2+1]));
-                hash_index.push((ctx.finish()).into());
+            while temp.len() < count {
+                let left_length = temp.len() - count/2;  //1
+                let mut inner_count = 2usize;
+                loop{
+                    if inner_count < left_length{
+                        inner_count *= 2;
+                    }
+                    else{
+                        break;
+                    }
+                }
+                let mut append_length = 0;
+                if inner_count == left_length{
+                    append_length = inner_count;
+                }
+                else{
+                    append_length = inner_count - left_length;
+                }
+                let mut appendVec: Vec<H256> = [].to_vec();
+                // for idx in (count/2)..(count/2 + append_length){
+                for idx in (temp.len()-append_length)..(temp.len()){
+                    appendVec.push(temp[idx]);
+                }
+                temp.extend(appendVec.iter().copied());
             }
-            base = base + num;
-            num = num/2;
-            if num % 2 > 0 && num > 1 {
-                hash_index.push(hash_index[base+num-1]);
-                num = num + 1;
+            // after duplicate
+            let mut level_len = temp.len();
+            let mut anchor = 0;
+            while level_len > 1 {
+                for idx in 0..(level_len/2){
+                    let mut ctx = digest::Context::new(&digest::SHA256);
+                    ctx.update(&(<[u8; 32]>::from(temp[2*idx+anchor])));
+                    ctx.update(&(<[u8; 32]>::from(temp[2*idx+anchor+1])));
+                    let multi_part = ctx.finish();
+                    temp.push(<H256>::from(multi_part));
+                }
+                anchor += level_len;
+                level_len /= 2;
             }
         }
+        let tree_root = temp[temp.len()-1];
+        let tree = MerkleTree{root:tree_root, leaf_data: temp};
+        tree
+        // unimplemented!()
 
-        hash_index.reverse();
-        return MerkleTree{hash_idx:hash_index};
+        // let mut hash_index = vec![];
+        // let mut num = data.len();
+        // let mut base = 0;
+        // for i in 0..num {
+        //     hash_index.push(data[i].hash());
+        // }
+        // let mut p = 0;
+        // let n:usize = 2;
+        // while num > 1 {
+        //     if num % 2 == 1 {
+        //         let len = hash_index.len();
+        //         for k in len-n.pow(p)..len {
+        //             hash_index.push(hash_index[k]);
+        //         num += 1;
+        //         }
+        //     }
+        //     num /= 2;
+        //     p += 1;
+        // }
+        // num = hash_index.len();
+        // while num > 1 {
+        //     for i in 0..num/2 {
+        //         let mut ctx = digest::Context::new(&digest::SHA256);
+        //         ctx.update(&<[u8;32]>::from(&hash_index[base+i*2]));
+        //         ctx.update(&<[u8;32]>::from(&hash_index[base+i*2+1]));
+        //         hash_index.push((ctx.finish()).into());
+        //     }
+        //     base = base + num;
+        //     num = num/2;
+        //     if num % 2 > 0 && num > 1 {
+        //         hash_index.push(hash_index[base+num-1]);
+        //         num = num + 1;
+        //     }
+        // }
+
+        // hash_index.reverse();
+        // return MerkleTree{hash_idx:hash_index};
     }
 
     pub fn root(&self) -> H256 {
