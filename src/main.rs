@@ -23,6 +23,9 @@ use std::time;
 use std::sync::{Arc, Mutex};
 use crate::blockchain::Blockchain;
 use crate::transaction::Mempool;
+use std::collections::HashMap;
+use crate::crypto::hash::{Hashable,H256};
+use crate::block::Block;
 
 
 fn main() {
@@ -80,11 +83,13 @@ fn main() {
             error!("Error parsing P2P workers: {}", e);
             process::exit(1);
         });
+    let mut new_Hashmap = Arc::new(Mutex::new(HashMap::new()));
     let worker_ctx = worker::new(
         p2p_workers,
         msg_rx,
         &server,
         &blockchain,
+        &new_Hashmap,
         &mempool,
     );
     worker_ctx.start();

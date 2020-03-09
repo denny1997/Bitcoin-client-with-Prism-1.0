@@ -143,7 +143,8 @@ impl Context {
 
             let mut content:Vec<SignedTransaction> = vec![];
             let mut content_hash: Vec<H256> = vec![];
-            if mempool.transactions.len() <= 16 {
+            let mempool_capacity = 16;
+            if mempool.transactions.len() <= mempool_capacity {
                 // println!("if");
                 for (h, t) in mempool.transactions.iter() {
                     content.push((*t).clone());
@@ -157,12 +158,12 @@ impl Context {
                     content_hash.push((*h).clone());
                     // (*mempool).transactions.remove(h);
                     num += 1;
-                    if num == 16 {
+                    if num == mempool_capacity {
                         break;
                     }
                 }
             }
-            println!("{:?}!!!!!!!!!!!!!!!!!{:?}", content.len(), mempool.transactions.len());
+            // println!("{:?}!!!!!!!!!!!!!!!!!{:?}", content.len(), mempool.transactions.len());
             let root = MerkleTree::new(&content).root();
             // println!("!!!!!!!yes!!!!!");
             let mut rng = rand::thread_rng();
@@ -170,13 +171,14 @@ impl Context {
             let header:Header = Header{parent:parent,nonce:nonce,difficulty:difficulty,timestamp:timestamp,merkle_root:root};
             let content:Content = Content{data:content};
             let block: Block = Block{header: header, content: content};
-
+            // println!("Mempool length: {:?}", (*mempool).transactions.len());
             if block.hash()<= difficulty {
                 //Arc::make_mut(&mut self.blockchain).get_mut().unwrap().insert(&block);
                 (*blockchain).insert(&block);
-                for key in content_hash{
+                for key in content_hash.clone(){
                     (*mempool).transactions.remove(&key);
                 }
+                let transactions_num = content_hash.len();
                 // let currentTime = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
                 // let durationSinceMined = currentTime - block.header.timestamp;
                 let mut v = vec![];
@@ -184,7 +186,8 @@ impl Context {
                 self.server.broadcast(Message::NewBlockHashes(v));
                 counter += 1;
                 let encoded_block: Vec<u8> = bincode::serialize(&block).unwrap();
-                println!("!!!!!!!!!!!!!!!I did it! Counter: {:?}, Block size is: {:?}", counter, encoded_block.len());
+                println!("!!!!!!!!!!!!!!!I did it! Counter: {:?}, Block size is: {:?}, Block contains {:?} transactions", counter, encoded_block.len(), transactions_num);
+                
                 //self.blockchain = Arc::new(Mutex::new(blockchain));
             }
 

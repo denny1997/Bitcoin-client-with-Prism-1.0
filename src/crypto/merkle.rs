@@ -76,7 +76,7 @@ impl MerkleTree {
             }
         }
         let tree_root = temp[temp.len()-1];
-        let tree = MerkleTree{root:tree_root, leaf_data: temp};
+        let tree = MerkleTree{hash_idx: temp};
         tree
         // unimplemented!()
 

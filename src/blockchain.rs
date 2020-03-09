@@ -20,7 +20,7 @@ impl Blockchain {
         let merkle_root = MerkleTree::new(&data).root();
         // let t1 = [255; 16];
         // let t2 = [0; 8];
-        let mut difficulty: [u8; 32] = [0,0,63,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255];
+        let mut difficulty: [u8; 32] = [0,1,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255];
         // difficulty.copy_from_slice(&([t2,t1].concat())[..]);
         let header:Header = Header{parent:merkle_root,nonce:0,difficulty:difficulty.into(),timestamp:0,merkle_root:merkle_root};
         let content:Content = Content{data:data};

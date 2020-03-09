@@ -63,7 +63,7 @@ impl Context {
 
     fn worker_loop(&mut self) {
         loop {
-            let duration = time::Duration::from_millis(2000);
+            let duration = time::Duration::from_millis(3000);
             thread::sleep(duration);
             // println!("I'm running!");
             

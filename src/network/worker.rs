@@ -19,7 +19,7 @@ pub struct Context {
     num_worker: usize,
     server: ServerHandle,
     blockchain: Arc<Mutex<Blockchain>>,
-    buffer: HashMap<H256, Block>,
+    buffer: Arc<Mutex<HashMap<H256, Block>>>,
     mempool: Arc<Mutex<Mempool>>,
 }
 
@@ -28,6 +28,7 @@ pub fn new(
     msg_src: channel::Receiver<(Vec<u8>, peer::Handle)>,
     server: &ServerHandle,
     blockchain: &Arc<Mutex<Blockchain>>,
+    hashMap: &Arc<Mutex<HashMap<H256, Block>>>,
     mempool: &Arc<Mutex<Mempool>>,
 ) -> Context {
     Context {
@@ -35,7 +36,7 @@ pub fn new(
         num_worker,
         server: server.clone(),
         blockchain: Arc::clone(blockchain),
-        buffer: HashMap::new(),
+        buffer: Arc::clone(hashMap),
         mempool: Arc::clone(mempool),
     }
 }
@@ -64,6 +65,9 @@ impl Context {
             let temp_mempool = Arc::clone(&self.mempool);
             let mut mempool = temp_mempool.lock().unwrap();
             // println!("4");
+
+            let temp_buffer = Arc::clone(&self.buffer);
+            let mut buffer = temp_buffer.lock().unwrap();
             let (msg, peer) = msg;
             let msg: Message = bincode::deserialize(&msg).unwrap();
             match msg {
@@ -143,7 +147,7 @@ impl Context {
                     if b.len()>0{
                         peer.write(Message::Blocks(b));
                         println!("Blockchain length: {:?}", blockchain.blocks.len());
-                        println!("Buffer length: {:?}", self.buffer.len());
+                        println!("Buffer length: {:?}", (*buffer).len());
                         println!("Tip: {:?}", (*blockchain).tip());
                     }
                     
@@ -159,13 +163,13 @@ impl Context {
                         if block.header.difficulty >= block.hash() {
                             if !blockchain.blocks.contains_key(&block.hash()) {
                                 if !blockchain.blocks.contains_key(&block.header.parent){                                   
-                                    self.buffer.insert(block.header.parent,block.clone());
+                                    (*buffer).insert(block.header.parent,block.clone());
                                     debug!("Parent not recieved yet");
                                     p.push(block.header.parent)                                                                     
                                 } else {
                                     if block.header.difficulty == blockchain.blocks[&block.header.parent].header.difficulty {
                                         let contents = &(&block.clone()).content.data;
-                                        let mut flag = false;
+                                        let mut flag = false; 
                                         for signedTransaction in contents {
                                             // let signature: Signature = bincode::deserialize(&signedTransaction.signature[..]).unwrap();
                                             // let public_key = ring::signature::UnparsedPublicKey::new(&signature::ED25519, signedTransaction.public_key);
@@ -177,12 +181,21 @@ impl Context {
                                             if !verify(transaction, public_key, signature) {
                                                 flag = true;    // invalid signature
                                                 break;
+                                                println!("ooooooooops, something is not good!");
                                             }
                                         }
                                         if flag {
                                             break;
                                         }
                                         (*blockchain).insert(&block);
+                                        for t in contents{
+                                            let key = t.hash();
+                                            if (*mempool).transactions.contains_key(&key){
+                                                (*mempool).transactions.remove(&key);
+                                            }
+                                        }
+
+
                                         let currentTime = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
                                         let durationSinceMined = currentTime - block.header.timestamp;
                                         println!("!!!!!!!!!!!!!!!!!!!Latency: {:?}", durationSinceMined);
@@ -190,12 +203,12 @@ impl Context {
                                         let mut parent = block.hash();
                                         let difficulty = block.header.difficulty;
                                         let mut temp;
-                                        while self.buffer.contains_key(&parent) {
+                                        while (*buffer).contains_key(&parent) {
                                             println!("stucked! TAT");
-                                            if self.buffer[&parent].header.difficulty != difficulty {
+                                            if (*buffer)[&parent].header.difficulty != difficulty {
                                                 break;
                                             }
-                                            let contents = &(self.buffer[&parent].clone()).content.data;
+                                            let contents = &((*buffer)[&parent].clone()).content.data;
                                             let mut flag = false;
                                             for signedTransaction in contents {
                                                 // let signature: Signature = bincode::deserialize(&signedTransaction.signature[..]).unwrap();
@@ -207,6 +220,7 @@ impl Context {
                                                 let transaction = &signedTransaction.transaction;
                                                 if !verify(transaction, public_key, signature) {
                                                     flag = true;    // invalid signature
+                                                    println!("ooooooooops, something is not good!");
                                                     break;
                                                 }
                                             }
@@ -214,10 +228,16 @@ impl Context {
                                                 break;
                                             }
 
-                                            (*blockchain).insert(&self.buffer[&parent]); 
-                                            broadcast_blocks_hashes.push((self.buffer[&parent]).clone().hash());                         
-                                            temp = self.buffer[&parent].hash();
-                                            self.buffer.remove(&parent);
+                                            (*blockchain).insert(&(*buffer)[&parent]); 
+                                            for t in contents{
+                                                let key = t.hash();
+                                                if (*mempool).transactions.contains_key(&key){
+                                                    (*mempool).transactions.remove(&key);
+                                                }
+                                            }
+                                            broadcast_blocks_hashes.push(((*buffer)[&parent]).clone().hash());                         
+                                            temp = (*buffer)[&parent].hash();
+                                            (*buffer).remove(&parent);
                                             parent = temp;
                                         }
                                     }
@@ -232,7 +252,7 @@ impl Context {
                         self.server.broadcast(Message::NewBlockHashes(broadcast_blocks_hashes));
                     }
                     println!("Blockchain length: {:?}", blockchain.blocks.len());
-                    println!("Buffer length: {:?}", self.buffer.len());
+                    println!("Buffer length: {:?}", (*buffer).len());
                     println!("Tip: {:?}", (*blockchain).tip());
                 }
             }
