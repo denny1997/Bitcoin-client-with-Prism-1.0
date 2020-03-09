@@ -105,6 +105,7 @@ impl Context {
 
     fn miner_loop(&mut self) {
         // main mining loop
+
         let mut counter = 0;
         loop {
             // check and react to control signals
@@ -141,22 +142,29 @@ impl Context {
             let difficulty = blockchain.blocks[&parent].header.difficulty;
 
             let mut content:Vec<SignedTransaction> = vec![];
-            if mempool.transactions.len() <= 64 {
+            let mut content_hash: Vec<H256> = vec![];
+            if mempool.transactions.len() <= 16 {
+                // println!("if");
                 for (h, t) in mempool.transactions.iter() {
                     content.push((*t).clone());
+                    content_hash.push((*h).clone());
                 }
             } else {
+                // println!("else");
                 let mut num = 0;
                 for (h, t) in mempool.clone().transactions.iter() {
                     content.push((*t).clone());
-                    (*mempool).transactions.remove(h);
+                    content_hash.push((*h).clone());
+                    // (*mempool).transactions.remove(h);
                     num += 1;
-                    if num == 64 {
+                    if num == 16 {
                         break;
                     }
                 }
             }
+            println!("{:?}!!!!!!!!!!!!!!!!!{:?}", content.len(), mempool.transactions.len());
             let root = MerkleTree::new(&content).root();
+            // println!("!!!!!!!yes!!!!!");
             let mut rng = rand::thread_rng();
             let nonce: u32 = rng.gen();
             let header:Header = Header{parent:parent,nonce:nonce,difficulty:difficulty,timestamp:timestamp,merkle_root:root};
@@ -166,6 +174,9 @@ impl Context {
             if block.hash()<= difficulty {
                 //Arc::make_mut(&mut self.blockchain).get_mut().unwrap().insert(&block);
                 (*blockchain).insert(&block);
+                for key in content_hash{
+                    (*mempool).transactions.remove(&key);
+                }
                 // let currentTime = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
                 // let durationSinceMined = currentTime - block.header.timestamp;
                 let mut v = vec![];

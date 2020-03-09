@@ -54,15 +54,16 @@ impl Context {
 
     fn worker_loop(&mut self) {
         loop {
+            // println!("0");
             let msg = self.msg_chan.recv().unwrap();
-            // println!("3");
-            let temp = Arc::clone(&self.blockchain);
             // println!("1");
-            let mut blockchain = temp.lock().unwrap();
+            let temp = Arc::clone(&self.blockchain);
             // println!("2");
+            let mut blockchain = temp.lock().unwrap();
+            // println!("3");
             let temp_mempool = Arc::clone(&self.mempool);
             let mut mempool = temp_mempool.lock().unwrap();
-
+            // println!("4");
             let (msg, peer) = msg;
             let msg: Message = bincode::deserialize(&msg).unwrap();
             match msg {

@@ -14,7 +14,7 @@ use clap::clap_app;
 use crossbeam::channel;
 use log::{error, info};
 use api::Server as ApiServer;
-use network::{server, worker};
+use network::{server, worker, generator};
 use std::net;
 use std::process;
 use std::thread;
@@ -23,6 +23,7 @@ use std::time;
 use std::sync::{Arc, Mutex};
 use crate::blockchain::Blockchain;
 use crate::transaction::Mempool;
+
 
 fn main() {
     // parse command line arguments
@@ -87,6 +88,15 @@ fn main() {
         &mempool,
     );
     worker_ctx.start();
+
+    // start the transaction generator
+    let generator = generator::new(
+        1,
+        &server,
+        &mempool,
+    );
+    generator.start();
+
 
     // start the miner
     let (miner_ctx, miner) = miner::new(
