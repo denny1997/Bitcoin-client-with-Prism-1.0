@@ -1,10 +1,55 @@
 use serde::{Serialize,Deserialize};
 use ring::signature::{Ed25519KeyPair, Signature, KeyPair, VerificationAlgorithm, EdDSAParameters};
+use ring::signature::KeyPair::PublicKey;
 use rand::Rng;
 use ring::digest;
 use crate::crypto::hash::{H256, Hashable};
 use crate::crypto::address::H160;
 use std::collections::HashMap;
+
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct StatePerBlock {
+    pub spb: HashMap<H256, State>,
+}
+
+impl StatePerBlock {
+    pub fn insert(&mut self, block_hash: H256, state: &State) {
+        self.spb.insert(block_hash,state.clone());
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct State {
+    pub states: HashMap<H160,(u32,u32)>,
+}
+
+impl State {
+    pub fn new(keys: Vec<KeyPair>) -> Self {
+        let mut states: HashMap<H160,(u32,u32)> = HashMap::new();
+        for key in keys {
+            let public_key = key.public_key().as_ref();
+            states.insert(public_key.into(),(0, 1000));
+        }
+        return State{states:states};
+    }
+
+    pub fn addressCheck(&self, public_key: &[u8]) -> bool {
+        if self.states.contains_key(&public_key.into()) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    pub fn spendCheck(&self, public_key: &[u8], value:u32, accountNonce:u32) -> bool {
+        let accountInfo = self.states[&public_key.into()];
+        if (accountInfo.0 == accountNonce - 1) && (accountInfo.1 >= value) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct Mempool {
