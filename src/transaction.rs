@@ -1,6 +1,5 @@
 use serde::{Serialize,Deserialize};
 use ring::signature::{Ed25519KeyPair, Signature, KeyPair, VerificationAlgorithm, EdDSAParameters};
-use ring::signature::KeyPair::PublicKey;
 use rand::Rng;
 use ring::digest;
 use crate::crypto::hash::{H256, Hashable};
@@ -24,7 +23,7 @@ pub struct State {
 }
 
 impl State {
-    pub fn new(keys: Vec<KeyPair>) -> Self {
+    pub fn new(keys: Vec<Ed25519KeyPair>) -> Self {
         let mut states: HashMap<H160,(u32,u32)> = HashMap::new();
         for key in keys {
             let public_key = key.public_key().as_ref();
