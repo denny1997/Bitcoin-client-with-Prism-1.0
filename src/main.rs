@@ -27,6 +27,7 @@ use std::collections::HashMap;
 use crate::crypto::hash::{Hashable,H256};
 use crate::block::Block;
 use crate::crypto::key_pair;
+use ring::signature::{Ed25519KeyPair};
 
 
 fn main() {
@@ -39,6 +40,7 @@ fn main() {
      (@arg api_addr: --api [ADDR] default_value("127.0.0.1:7000") "Sets the IP address and the port of the API server")
      (@arg known_peer: -c --connect ... [PEER] "Sets the peers to connect to at start")
      (@arg p2p_workers: --("p2p-workers") [INT] default_value("4") "Sets the number of worker threads for P2P server")
+     (@arg generate: -g --("generator") [INT] default_value("0") "Sets generator status")
     )
     .get_matches();
 
@@ -71,11 +73,14 @@ fn main() {
     let mut blockchain = Arc::new(Mutex::new(Blockchain::new()));
     let mut mempool = Arc::new(Mutex::new(Mempool::new()));
     let mut keys = vec![];
-    for _ in 0..5 {
+    let mut key_hashtable: HashMap<u32, Ed25519KeyPair>=HashMap::new();
+    for i in 0..5 {
         let key = key_pair::random();
-        keys.push(key);
+        key_hashtable.insert(i, key);
+        // keys.push(key);
     }
     let mut state = Arc::new(Mutex::new(State::new(keys)));
+    let mut key_set = Arc::new(Mutex::new(key_hashtable));
 
     // start the p2p server
     let (server_ctx, server) = server::new(p2p_addr, msg_tx).unwrap();
@@ -91,6 +96,7 @@ fn main() {
             process::exit(1);
         });
 
+
     let mut new_Hashmap = Arc::new(Mutex::new(HashMap::new()));
     let worker_ctx = worker::new(
         p2p_workers,
@@ -102,13 +108,17 @@ fn main() {
     );
     worker_ctx.start();
 
-    // start the transaction generator
-    let generator = generator::new(
-        1,
-        &server,
-        &mempool,
-    );
-    generator.start();
+    if Some("1") == matches.value_of("generate") {
+        // start the transaction generator
+        let generator = generator::new(
+            1,
+            &server,
+            &mempool,
+            // &state,
+            &key_set,
+        );
+        generator.start();
+    }
 
 
     // start the miner
