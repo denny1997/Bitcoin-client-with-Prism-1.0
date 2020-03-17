@@ -206,6 +206,7 @@ impl Context {
                                         let contents = &(&block.clone()).content.data;
                                         let mut flag = false; 
                                         let mut state = spb.spb[&block.header.parent].clone();
+                                        let mut validTransaction = vec![];
 
                                         for signedTransaction in contents {
                                             // let signature: Signature = bincode::deserialize(&signedTransaction.signature[..]).unwrap();
@@ -236,18 +237,30 @@ impl Context {
                                             // println!("23");
                                             if state.spendCheck(&public_key[..], value, accountNonce) {
                                                 // println!("231");
-                                                let sender = state.states[&senderAddr];
-                                                // println!("2311");
-                                                let repient = state.states[&recipientAddr];
-                                                // println!("232");
-                                                state.insert(senderAddr,(sender.1)-value, (sender.0)+1);
-                                                state.insert(recipientAddr,(repient.1)+value, repient.0);
+                                                // let sender = state.states[&senderAddr];
+                                                // // println!("2311");
+                                                // let repient = state.states[&recipientAddr];
+                                                // // println!("232");
+                                                // state.insert(senderAddr,(sender.1)-value, (sender.0)+1);
+                                                // state.insert(recipientAddr,(repient.1)+value, repient.0);
+                                                validTransaction.push(signedTransaction);
                                             }
                                             // println!("24");
 
                                         }
                                         if flag {
                                             break;
+                                        }
+                                        for vt in validTransaction {
+                                            let public_key = &vt.public_key;
+                                            let transaction = &vt.transaction;
+                                            let recipientAddr = transaction.recipientAddr;
+                                            let senderAddr: H160 = public_key[..].into();
+                                            let value = transaction.value;
+                                            let sender = state.states[&senderAddr];
+                                            let repient = state.states[&recipientAddr];
+                                            state.insert(senderAddr,(sender.1)-value, (sender.0)+1);
+                                            state.insert(recipientAddr,(repient.1)+value, repient.0);
                                         }
                                         // println!("3");
                                         println!("{:?} hhh", block.hash());
@@ -287,6 +300,7 @@ impl Context {
                                             let contents = &((*buffer)[&parent].clone()).content.data;
                                             let mut flag = false;
                                             let mut state = spb.spb[&parent].clone();
+                                            let mut validTransaction = vec![];
                                             for signedTransaction in contents {
                                                 // let signature: Signature = bincode::deserialize(&signedTransaction.signature[..]).unwrap();
                                                 // let public_key = ring::signature::UnparsedPublicKey::new(&signature::ED25519, signedTransaction.public_key);
@@ -308,14 +322,26 @@ impl Context {
                                                     state.insert(public_key[..].into(), 1000, 0);
                                                 }
                                                 if state.spendCheck(&public_key[..], value, accountNonce) {
-                                                    let sender = state.states[&senderAddr];
-                                                    let repient = state.states[&recipientAddr];
-                                                    state.insert(senderAddr,(sender.1)-value, (sender.0)+1,);
-                                                    state.insert(recipientAddr,(repient.1)+value, repient.0);
+                                                    // let sender = state.states[&senderAddr];
+                                                    // let repient = state.states[&recipientAddr];
+                                                    // state.insert(senderAddr,(sender.1)-value, (sender.0)+1,);
+                                                    // state.insert(recipientAddr,(repient.1)+value, repient.0);
+                                                    validTransaction.push(signedTransaction);
                                                 }
                                             }
                                             if flag {
                                                 break;
+                                            }
+                                            for vt in validTransaction {
+                                                let public_key = &vt.public_key;
+                                                let transaction = &vt.transaction;
+                                                let recipientAddr = transaction.recipientAddr;
+                                                let senderAddr: H160 = public_key[..].into();
+                                                let value = transaction.value;
+                                                let sender = state.states[&senderAddr];
+                                                let repient = state.states[&recipientAddr];
+                                                state.insert(senderAddr,(sender.1)-value, (sender.0)+1);
+                                                state.insert(recipientAddr,(repient.1)+value, repient.0);
                                             }
           
                                             (*spb).insert((*buffer)[&parent].hash(),&state);

@@ -180,6 +180,7 @@ impl Context {
             if block.hash()<= difficulty {
                 //Arc::make_mut(&mut self.blockchain).get_mut().unwrap().insert(&block);
                 let mut state = spb.spb[&block.header.parent].clone();
+                let mut validTransaction = vec![];
                 let contents = &(&block.clone()).content.data;
                 for signedTransaction in contents {
                     let signature = &signedTransaction.signature;
@@ -202,14 +203,28 @@ impl Context {
                     // println!("23");
                     if state.spendCheck(&public_key[..], value, accountNonce) {
                         // println!("231");
-                        let sender = state.states[&senderAddr];
-                        // println!("2311");
-                        let repient = state.states[&recipientAddr];
-                        // println!("232");
-                        state.insert(senderAddr,(sender.1)-value, (sender.0)+1);
-                        state.insert(recipientAddr,(repient.1)+value, repient.0);
+                        // let sender = state.states[&senderAddr];
+                        // // println!("2311");
+                        // let repient = state.states[&recipientAddr];
+                        // // println!("232");
+                        // state.insert(senderAddr,(sender.1)-value, (sender.0)+1);
+                        // state.insert(recipientAddr,(repient.1)+value, repient.0);
+                        validTransaction.push(signedTransaction);
                     }
                 }
+                
+                for vt in validTransaction {
+                    let public_key = &vt.public_key;
+                    let transaction = &vt.transaction;
+                    let recipientAddr = transaction.recipientAddr;
+                    let senderAddr: H160 = public_key[..].into();
+                    let value = transaction.value;
+                    let sender = state.states[&senderAddr];
+                    let repient = state.states[&recipientAddr];
+                    state.insert(senderAddr,(sender.1)-value, (sender.0)+1);
+                    state.insert(recipientAddr,(repient.1)+value, repient.0);
+                }
+
                 (*spb).insert(block.hash(),&state);
                 (*blockchain).insert(&block);
                 for key in content_hash.clone(){
