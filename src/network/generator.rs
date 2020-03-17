@@ -29,7 +29,7 @@ pub struct Context {
     // buffer: HashMap<H256, Block>,
     mempool: Arc<Mutex<Mempool>>,
     // keyPairs: Vec<Ed25519KeyPair>,
-    // state: Arc<Mutex<State>>,
+    state: Arc<Mutex<State>>,
     key_set: Arc<Mutex<HashMap<u32, Ed25519KeyPair>>>,
 }
 
@@ -40,7 +40,7 @@ pub fn new(
     // blockchain: &Arc<Mutex<Blockchain>>,
     mempool: &Arc<Mutex<Mempool>>,
     // keyPairs: Vec<Ed25519KeyPair>,
-    // state: &Arc<Mutex<State>>,
+    state: &Arc<Mutex<State>>,
     key_set: &Arc<Mutex<HashMap<u32, Ed25519KeyPair>>>,
 ) -> Context {
     Context {
@@ -51,7 +51,7 @@ pub fn new(
         // buffer: HashMap::new(),
         mempool: Arc::clone(mempool),
         // keyPairs: keyPairs.clone(),
-        // state: Arc::clone(state),
+        state: Arc::clone(state),
         key_set: Arc::clone(key_set),
     }
 }
@@ -74,7 +74,7 @@ impl Context {
             record.insert(i,(0,1000));
         }
         loop {
-            let duration = time::Duration::from_millis(3000);
+            let duration = time::Duration::from_millis(2000);
             thread::sleep(duration);
             // println!("I'm running!");
             

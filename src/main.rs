@@ -83,7 +83,7 @@ fn main() {
     }
 
     let temp_state = State::new();
-    // let mut state = Arc::new(Mutex::new(temp_state.clone()));
+    let mut state = Arc::new(Mutex::new(temp_state.clone()));
     let mut spb = Arc::new(Mutex::new(StatePerBlock::new(temp_blockchain.genesis, temp_state)));
     let mut key_set = Arc::new(Mutex::new(key_hashtable));
 
@@ -122,7 +122,7 @@ fn main() {
             1,
             &server,
             &mempool,
-            // &state,
+            &state,
             &key_set,
         );
         generator.start();
