@@ -11,7 +11,8 @@ use std::collections::HashMap;
 use std::time::SystemTime;
 use std::thread;
 use ring::signature::{Signature, KeyPair, Ed25519KeyPair};
-use crate::transaction::{verify,Mempool};
+use crate::transaction::{verify,Mempool,State,StatePerBlock};
+use crate::crypto::address::H160;
 
 #[derive(Clone)]
 pub struct Context {
@@ -21,6 +22,8 @@ pub struct Context {
     blockchain: Arc<Mutex<Blockchain>>,
     buffer: Arc<Mutex<HashMap<H256, Block>>>,
     mempool: Arc<Mutex<Mempool>>,
+    // state: Arc<Mutex<State>>,
+    spb: Arc<Mutex<StatePerBlock>>,
 }
 
 pub fn new(
@@ -30,6 +33,8 @@ pub fn new(
     blockchain: &Arc<Mutex<Blockchain>>,
     hashMap: &Arc<Mutex<HashMap<H256, Block>>>,
     mempool: &Arc<Mutex<Mempool>>,
+    // state: &Arc<Mutex<State>>,
+    spb: &Arc<Mutex<StatePerBlock>>,
 ) -> Context {
     Context {
         msg_chan: msg_src,
@@ -38,6 +43,8 @@ pub fn new(
         blockchain: Arc::clone(blockchain),
         buffer: Arc::clone(hashMap),
         mempool: Arc::clone(mempool),
+        // state: Arc::clone(state),
+        spb: Arc::clone(spb),
     }
 }
 
@@ -65,6 +72,12 @@ impl Context {
             let temp_mempool = Arc::clone(&self.mempool);
             let mut mempool = temp_mempool.lock().unwrap();
             // println!("4");
+
+            // let temp_state = Arc::clone(&self.state);
+            // let mut state = temp_state.lock().unwrap();
+
+            let temp_spb = Arc::clone(&self.spb);
+            let mut spb = temp_spb.lock().unwrap();
 
             let temp_buffer = Arc::clone(&self.buffer);
             let mut buffer = temp_buffer.lock().unwrap();
@@ -105,14 +118,25 @@ impl Context {
                 Message::Transactions(transactions) => {
                     debug!("Transactions");
                     let mut broadcast_transactions_hashes = vec![];
+                    let state = &spb.spb[&blockchain.tip()];
                     for transaction in transactions {
                         if !mempool.transactions.contains_key(&transaction.hash()) {                           
                             let signature = &transaction.signature;
                             let public_key = &transaction.public_key;
                             let transaction_content = &transaction.transaction;
                             if verify(transaction_content, public_key, signature) {
-                                (*mempool).insert(&transaction);
-                                broadcast_transactions_hashes.push(transaction.clone().hash());
+                                if !state.addressCheck(public_key) {
+                                    // (*state).insert(public_key[..].into(), 1000, 0);
+                                    if (transaction_content.value <= 1000) && (transaction_content.accountNonce == 1){
+                                        (*mempool).insert(&transaction);
+                                        broadcast_transactions_hashes.push(transaction.clone().hash());
+                                    }
+                                } else {
+                                    if state.spendCheck(public_key, transaction_content.value, transaction_content.accountNonce) {
+                                        (*mempool).insert(&transaction);
+                                        broadcast_transactions_hashes.push(transaction.clone().hash());
+                                    } 
+                                }
                             }                                                        
                         }                                              
                     }
@@ -170,6 +194,8 @@ impl Context {
                                     if block.header.difficulty == blockchain.blocks[&block.header.parent].header.difficulty {
                                         let contents = &(&block.clone()).content.data;
                                         let mut flag = false; 
+                                        let mut state = spb.spb[&block.header.parent].clone();
+
                                         for signedTransaction in contents {
                                             // let signature: Signature = bincode::deserialize(&signedTransaction.signature[..]).unwrap();
                                             // let public_key = ring::signature::UnparsedPublicKey::new(&signature::ED25519, signedTransaction.public_key);
@@ -183,15 +209,38 @@ impl Context {
                                                 break;
                                                 println!("ooooooooops, something is not good!");
                                             }
+                                            let recipientAddr = transaction.recipientAddr;
+                                            let value = transaction.value;
+                                            let accountNonce = transaction.accountNonce;
+                                            let senderAddr: H160 = public_key[..].into();
+                                            if !state.addressCheck(&public_key[..]) {
+                                                state.insert(public_key[..].into(), 1000, 0);
+                                            }
+                                            if state.spendCheck(&public_key[..], value, accountNonce) {
+                                                let sender = state.states[&senderAddr];
+                                                let repient = state.states[&recipientAddr];
+                                                state.insert(senderAddr,(sender.1)-value, (sender.0)+1);
+                                                state.insert(recipientAddr,(repient.1)+value, repient.0);
+                                            }
+
                                         }
                                         if flag {
                                             break;
                                         }
                                         (*blockchain).insert(&block);
+                                        (*spb).insert(block.hash(),&state);
                                         for t in contents{
                                             let key = t.hash();
                                             if (*mempool).transactions.contains_key(&key){
                                                 (*mempool).transactions.remove(&key);
+                                            }
+                                        }
+
+                                        for (key, value) in (*mempool).transactions.clone().iter() {
+                                            for t in contents {
+                                                if (t.public_key == value.public_key) && (t.transaction.accountNonce == value.transaction.accountNonce) {
+                                                    (*mempool).transactions.remove(&key);
+                                                }
                                             }
                                         }
 
@@ -210,6 +259,7 @@ impl Context {
                                             }
                                             let contents = &((*buffer)[&parent].clone()).content.data;
                                             let mut flag = false;
+                                            let mut state = spb.spb[&parent].clone();
                                             for signedTransaction in contents {
                                                 // let signature: Signature = bincode::deserialize(&signedTransaction.signature[..]).unwrap();
                                                 // let public_key = ring::signature::UnparsedPublicKey::new(&signature::ED25519, signedTransaction.public_key);
@@ -223,18 +273,43 @@ impl Context {
                                                     println!("ooooooooops, something is not good!");
                                                     break;
                                                 }
+                                                let recipientAddr = transaction.recipientAddr;
+                                                let value = transaction.value;
+                                                let accountNonce = transaction.accountNonce;
+                                                let senderAddr: H160 = public_key[..].into();
+                                                if !state.addressCheck(&public_key[..]) {
+                                                    state.insert(public_key[..].into(), 1000, 0);
+                                                }
+                                                if state.spendCheck(&public_key[..], value, accountNonce) {
+                                                    let sender = state.states[&senderAddr];
+                                                    let repient = state.states[&recipientAddr];
+                                                    state.insert(senderAddr,(sender.1)-value, (sender.0)+1,);
+                                                    state.insert(recipientAddr,(repient.1)+value, repient.0);
+                                                }
                                             }
                                             if flag {
                                                 break;
                                             }
 
                                             (*blockchain).insert(&(*buffer)[&parent]); 
+                                            (*spb).insert((*buffer)[&parent].hash(),&state);
+
                                             for t in contents{
                                                 let key = t.hash();
                                                 if (*mempool).transactions.contains_key(&key){
                                                     (*mempool).transactions.remove(&key);
                                                 }
                                             }
+
+                                            for (key, value) in (*mempool).transactions.clone().iter() {
+                                                for t in contents {
+                                                    if (t.public_key == value.public_key) && (t.transaction.accountNonce == value.transaction.accountNonce) {
+                                                        (*mempool).transactions.remove(&key);
+                                                    }
+                                                }
+                                            }
+    
+
                                             broadcast_blocks_hashes.push(((*buffer)[&parent]).clone().hash());                         
                                             temp = (*buffer)[&parent].hash();
                                             (*buffer).remove(&parent);

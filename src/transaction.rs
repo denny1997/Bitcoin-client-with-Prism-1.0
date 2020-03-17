@@ -12,6 +12,12 @@ pub struct StatePerBlock {
 }
 
 impl StatePerBlock {
+    pub fn new(genesis_hash: H256, genesis_state: State) -> Self {
+        let mut spb: HashMap<H256,State> = HashMap::new();
+        spb.insert(genesis_hash, genesis_state);
+        return StatePerBlock{spb:spb};
+    }
+
     pub fn insert(&mut self, block_hash: H256, state: &State) {
         self.spb.insert(block_hash,state.clone());
     }
@@ -23,13 +29,21 @@ pub struct State {
 }
 
 impl State {
-    pub fn new(keys: Vec<Ed25519KeyPair>) -> Self {
-        let mut states: HashMap<H160,(u32,u32)> = HashMap::new();
-        for key in keys {
-            let public_key = key.public_key().as_ref();
-            states.insert(public_key.into(),(0, 1000));
+    // pub fn new(keys: Vec<Ed25519KeyPair>) -> Self {
+    //     let mut states: HashMap<H160,(u32,u32)> = HashMap::new();
+    //     for key in keys {
+    //         let public_key = key.public_key().as_ref();
+    //         states.insert(public_key.into(),(0, 1000));
+    //     }
+    //     return State{states:states};
+    // }
+    pub fn new() -> Self {
+            let mut states: HashMap<H160,(u32,u32)> = HashMap::new();
+            return State{states:states};
         }
-        return State{states:states};
+
+    pub fn insert(&mut self, address: H160, balance: u32, nonce: u32) {
+        self.states.insert(address,(nonce,balance));
     }
 
     pub fn addressCheck(&self, public_key: &[u8]) -> bool {

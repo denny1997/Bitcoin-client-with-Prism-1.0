@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use crate::crypto::merkle::{MerkleTree};
 use crate::crypto::hash::Hashable;
 
+#[derive(Debug, Default, Clone)]
 pub struct Blockchain {
     pub blocks:HashMap<H256, Block>,
     pub height:HashMap<H256, u32>,
