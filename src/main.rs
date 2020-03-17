@@ -131,7 +131,7 @@ fn main() {
 
     // start the miner
     let (miner_ctx, miner) = miner::new(
-        &server, &blockchain, &mempool,
+        &server, &blockchain, &mempool,&spb,
     );
     miner_ctx.start();
 

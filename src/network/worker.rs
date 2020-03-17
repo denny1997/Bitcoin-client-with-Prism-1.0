@@ -118,7 +118,10 @@ impl Context {
                 Message::Transactions(transactions) => {
                     debug!("Transactions");
                     let mut broadcast_transactions_hashes = vec![];
+                    println!("1");
+                    println!("{:?}", blockchain.tip());
                     let state = &spb.spb[&blockchain.tip()];
+                    println!("2");
                     for transaction in transactions {
                         if !mempool.transactions.contains_key(&transaction.hash()) {                           
                             let signature = &transaction.signature;
@@ -127,15 +130,22 @@ impl Context {
                             if verify(transaction_content, public_key, signature) {
                                 if !state.addressCheck(public_key) {
                                     // (*state).insert(public_key[..].into(), 1000, 0);
-                                    if (transaction_content.value <= 1000) && (transaction_content.accountNonce == 1){
+                                    // if (transaction_content.value <= 1000) && (transaction_content.accountNonce == 1){
+                                    if (transaction_content.value <= 1000){
                                         (*mempool).insert(&transaction);
                                         broadcast_transactions_hashes.push(transaction.clone().hash());
+                                    }
+                                    else{
+                                        println!("not add 1");
                                     }
                                 } else {
                                     if state.spendCheck(public_key, transaction_content.value, transaction_content.accountNonce) {
                                         (*mempool).insert(&transaction);
                                         broadcast_transactions_hashes.push(transaction.clone().hash());
                                     } 
+                                    else{
+                                        println!("not add 2");
+                                    }
                                 }
                             }                                                        
                         }                                              
@@ -184,6 +194,7 @@ impl Context {
                     let mut p = vec![];
                     let mut broadcast_blocks_hashes = vec![];
                     for block in blocks {
+                        // println!("1");
                         if block.header.difficulty >= block.hash() {
                             if !blockchain.blocks.contains_key(&block.hash()) {
                                 if !blockchain.blocks.contains_key(&block.header.parent){                                   
@@ -209,33 +220,48 @@ impl Context {
                                                 break;
                                                 println!("ooooooooops, something is not good!");
                                             }
+                                            // println!("2");
                                             let recipientAddr = transaction.recipientAddr;
                                             let value = transaction.value;
                                             let accountNonce = transaction.accountNonce;
+                                            // println!("21");
                                             let senderAddr: H160 = public_key[..].into();
+                                            // println!("22");
                                             if !state.addressCheck(&public_key[..]) {
                                                 state.insert(public_key[..].into(), 1000, 0);
                                             }
+                                            if !state.states.contains_key(&recipientAddr){
+                                                state.insert(recipientAddr, 1000, 0);
+                                            }
+                                            // println!("23");
                                             if state.spendCheck(&public_key[..], value, accountNonce) {
+                                                // println!("231");
                                                 let sender = state.states[&senderAddr];
+                                                // println!("2311");
                                                 let repient = state.states[&recipientAddr];
+                                                // println!("232");
                                                 state.insert(senderAddr,(sender.1)-value, (sender.0)+1);
                                                 state.insert(recipientAddr,(repient.1)+value, repient.0);
                                             }
+                                            // println!("24");
 
                                         }
                                         if flag {
                                             break;
                                         }
-                                        (*blockchain).insert(&block);
+                                        // println!("3");
+                                        println!("{:?} hhh", block.hash());
                                         (*spb).insert(block.hash(),&state);
+                                        println!("123");
+                                        (*blockchain).insert(&block);
+                                        // println!("4");
                                         for t in contents{
                                             let key = t.hash();
                                             if (*mempool).transactions.contains_key(&key){
                                                 (*mempool).transactions.remove(&key);
                                             }
                                         }
-
+                                        // println!("5");
                                         for (key, value) in (*mempool).transactions.clone().iter() {
                                             for t in contents {
                                                 if (t.public_key == value.public_key) && (t.transaction.accountNonce == value.transaction.accountNonce) {
@@ -243,6 +269,7 @@ impl Context {
                                                 }
                                             }
                                         }
+                                        // println!("6");
 
 
                                         let currentTime = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
@@ -290,9 +317,9 @@ impl Context {
                                             if flag {
                                                 break;
                                             }
-
-                                            (*blockchain).insert(&(*buffer)[&parent]); 
+          
                                             (*spb).insert((*buffer)[&parent].hash(),&state);
+                                            (*blockchain).insert(&(*buffer)[&parent]); 
 
                                             for t in contents{
                                                 let key = t.hash();

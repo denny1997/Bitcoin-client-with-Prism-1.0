@@ -9,10 +9,11 @@ use std::thread;
 
 use std::sync::{Arc, Mutex};
 use crate::blockchain::Blockchain;
-use crate::transaction::Mempool;
+use crate::transaction::{verify,Mempool,State,StatePerBlock};
 use std::time::SystemTime;
 use crate::crypto::merkle::MerkleTree;
 use crate::crypto::hash::H256;
+use crate::crypto::address::H160;
 use rand::Rng;
 use crate::transaction::SignedTransaction;
 use crate::block::{Block,Header,Content};
@@ -38,6 +39,7 @@ pub struct Context {
     server: ServerHandle,
     blockchain: Arc<Mutex<Blockchain>>,
     mempool: Arc<Mutex<Mempool>>,
+    spb: Arc<Mutex<StatePerBlock>>,
 }
 
 #[derive(Clone)]
@@ -47,7 +49,7 @@ pub struct Handle {
 }
 
 pub fn new(
-    server: &ServerHandle, blockchain: &Arc<Mutex<Blockchain>>, mempool: &Arc<Mutex<Mempool>>
+    server: &ServerHandle, blockchain: &Arc<Mutex<Blockchain>>, mempool: &Arc<Mutex<Mempool>>, spb: &Arc<Mutex<StatePerBlock>>,
 ) -> (Context, Handle) {
     let (signal_chan_sender, signal_chan_receiver) = unbounded();
 
@@ -57,6 +59,7 @@ pub fn new(
         server: server.clone(),
         blockchain: Arc::clone(blockchain),
         mempool: Arc::clone(mempool),
+        spb: Arc::clone(spb),
     };
 
     let handle = Handle {
@@ -136,6 +139,8 @@ impl Context {
             let mut blockchain = temp.lock().unwrap();
             let temp_mempool = Arc::clone(&self.mempool);
             let mut mempool = temp_mempool.lock().unwrap();
+            let temp_spb = Arc::clone(&self.spb);
+            let mut spb = temp_spb.lock().unwrap();
             let parent = blockchain.tip();
             //println!("{:?}", parent);
             let timestamp:u128 = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
@@ -174,9 +179,49 @@ impl Context {
             // println!("Mempool length: {:?}", (*mempool).transactions.len());
             if block.hash()<= difficulty {
                 //Arc::make_mut(&mut self.blockchain).get_mut().unwrap().insert(&block);
+                let mut state = spb.spb[&block.header.parent].clone();
+                let contents = &(&block.clone()).content.data;
+                for signedTransaction in contents {
+                    let signature = &signedTransaction.signature;
+                    let public_key = &signedTransaction.public_key;
+                    let transaction = &signedTransaction.transaction;
+
+                    // println!("2");
+                    let recipientAddr = transaction.recipientAddr;
+                    let value = transaction.value;
+                    let accountNonce = transaction.accountNonce;
+                    // println!("21");
+                    let senderAddr: H160 = public_key[..].into();
+                    // println!("22");
+                    if !state.addressCheck(&public_key[..]) {
+                        state.insert(public_key[..].into(), 1000, 0);
+                    }
+                    if !state.states.contains_key(&recipientAddr){
+                        state.insert(recipientAddr, 1000, 0);
+                    }
+                    // println!("23");
+                    if state.spendCheck(&public_key[..], value, accountNonce) {
+                        // println!("231");
+                        let sender = state.states[&senderAddr];
+                        // println!("2311");
+                        let repient = state.states[&recipientAddr];
+                        // println!("232");
+                        state.insert(senderAddr,(sender.1)-value, (sender.0)+1);
+                        state.insert(recipientAddr,(repient.1)+value, repient.0);
+                    }
+                }
+                (*spb).insert(block.hash(),&state);
                 (*blockchain).insert(&block);
                 for key in content_hash.clone(){
                     (*mempool).transactions.remove(&key);
+                }
+
+                for (key, value) in (*mempool).transactions.clone().iter() {
+                    for t in contents {
+                        if (t.public_key == value.public_key) && (t.transaction.accountNonce == value.transaction.accountNonce) {
+                            (*mempool).transactions.remove(&key);
+                        }
+                    }
                 }
                 let transactions_num = content_hash.len();
                 // let currentTime = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
@@ -187,7 +232,7 @@ impl Context {
                 counter += 1;
                 let encoded_block: Vec<u8> = bincode::serialize(&block).unwrap();
                 println!("!!!!!!!!!!!!!!!I did it! Counter: {:?}, Block size is: {:?}, Block contains {:?} transactions", counter, encoded_block.len(), transactions_num);
-                
+
                 //self.blockchain = Arc::new(Mutex::new(blockchain));
             }
 

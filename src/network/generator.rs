@@ -15,6 +15,7 @@ use crate::transaction::{verify,sign,Mempool,Transaction,SignedTransaction,State
 use rand::Rng;
 use crate::crypto::key_pair;
 use std::time;
+use std::cmp;
 use crate::crypto::address::H160;
 
 
@@ -97,10 +98,10 @@ impl Context {
             let recipientBalance = record[&recipientIdx].1;
             let recipientPublicKey = (key_set[&recipientIdx]).public_key().as_ref();
 
-            let mut maxvalue:u32 = 0;
+            let mut currentBalance:u32 = 0;
             let mut nonce:u32 = 0;
 
-            maxvalue = record[&senderIdx].1;
+            currentBalance = record[&senderIdx].1;
             nonce = &record[&senderIdx].0+1;
             
 
@@ -119,8 +120,8 @@ impl Context {
             //     nonce = 1;
             // }
 
-            let value = rng.gen_range(0,maxvalue) as u32;
-            record.insert(senderIdx,(nonce, maxvalue-value));
+            let value = rng.gen_range(0,cmp::min(10,currentBalance)) as u32;
+            record.insert(senderIdx,(nonce, currentBalance-value));
             record.insert(recipientIdx, (recipientNonce,recipientBalance+value));
 
 
