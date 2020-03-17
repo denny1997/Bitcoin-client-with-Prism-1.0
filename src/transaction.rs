@@ -49,7 +49,8 @@ impl State {
 
     pub fn spendCheck(&self, public_key: &[u8], value:u32, accountNonce:u32) -> bool {
         let accountInfo = self.states[&public_key.into()];
-        if (accountInfo.0 == accountNonce - 1) && (accountInfo.1 >= value) {
+        if (accountInfo.0 < accountNonce) && (accountInfo.1 >= value) {
+        // if (accountInfo.1 >= value){
             return true;
         } else {
             return false;

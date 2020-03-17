@@ -118,10 +118,10 @@ impl Context {
                 Message::Transactions(transactions) => {
                     debug!("Transactions");
                     let mut broadcast_transactions_hashes = vec![];
-                    println!("1");
-                    println!("{:?}", blockchain.tip());
+                    // println!("1");
+                    // println!("{:?}", blockchain.tip());
                     let state = &spb.spb[&blockchain.tip()];
-                    println!("2");
+                    // println!("2");
                     for transaction in transactions {
                         if !mempool.transactions.contains_key(&transaction.hash()) {                           
                             let signature = &transaction.signature;
@@ -250,9 +250,9 @@ impl Context {
                                             break;
                                         }
                                         // println!("3");
-                                        println!("{:?} hhh", block.hash());
+                                        // println!("{:?} hhh", block.hash());
                                         (*spb).insert(block.hash(),&state);
-                                        println!("123");
+                                        // println!("123");
                                         (*blockchain).insert(&block);
                                         // println!("4");
                                         for t in contents{
