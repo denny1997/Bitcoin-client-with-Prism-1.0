@@ -74,18 +74,21 @@ fn main() {
     let temp_blockchain = Blockchain::new();
     let mut blockchain = Arc::new(Mutex::new(temp_blockchain.clone()));
     let mut mempool = Arc::new(Mutex::new(Mempool::new()));
-    // let mut keys = vec![];
+    let mut keys = vec![];
     let mut key_hashtable: HashMap<u32, Ed25519KeyPair>=HashMap::new();
     for i in 0..5 {
         let key = key_pair::random();
         key_hashtable.insert(i, key);
         // keys.push(key);
     }
-
+<<<<<<< HEAD
     let temp_state = State::new();
     // let mut state = Arc::new(Mutex::new(temp_state.clone()));
     let mut spb = Arc::new(Mutex::new(StatePerBlock::new(temp_blockchain.genesis, temp_state)));
+=======
+    let mut state = Arc::new(Mutex::new(State::new(keys)));
     let mut key_set = Arc::new(Mutex::new(key_hashtable));
+>>>>>>> 77417f9c00b91f1e9aca47dbc1233da107df77da
 
     // start the p2p server
     let (server_ctx, server) = server::new(p2p_addr, msg_tx).unwrap();
@@ -114,7 +117,6 @@ fn main() {
         &spb,
     );
     worker_ctx.start();
-
 
     if Some("1") == matches.value_of("generate") {
         // start the transaction generator
