@@ -125,10 +125,10 @@ impl Context {
             record.insert(senderIdx,(nonce, currentBalance-value));
             record.insert(recipientIdx, (recipientNonce,recipientBalance+value));
             
-            info!("Generate one tx: {:?} sends {:?} coins to {:?}", 
+            info!("Generate one tx: {:} sends {:?} coins to {:}", 
                 senderPublicKey_hash_h160,
                 value,
-                recipientPublicKey_hash_h160
+                recipientPublicKey_hash_h160,
             );
 
 
