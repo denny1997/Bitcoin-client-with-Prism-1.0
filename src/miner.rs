@@ -108,7 +108,6 @@ impl Context {
 
     fn miner_loop(&mut self) {
         // main mining loop
-        info!("Miner start mining");
 
         let mut counter = 0;
         loop {
@@ -195,9 +194,11 @@ impl Context {
                     // println!("22");
                     if !state.addressCheck(&public_key[..]) {
                         state.insert(public_key[..].into(), 1000, 0);
+                        info!("Offer 1000 coins to address {}", senderAddr);
                     }
                     if !state.states.contains_key(&recipientAddr){
                         state.insert(recipientAddr, 1000, 0);
+                        info!("Offer 1000 coins to address {}", senderAddr);
                     }
                     // println!("23");
                     if state.spendCheck(&public_key[..], value, accountNonce) {
@@ -222,8 +223,15 @@ impl Context {
                     let repient = state.states[&recipientAddr];
                     state.insert(senderAddr,(sender.1)-value, (sender.0)+1);
                     state.insert(recipientAddr,(repient.1)+value, repient.0);
+                    info!("{:} received {:?} coins from {:}", 
+                        recipientAddr,
+                        value,
+                        senderAddr,
+                    );
                 }
-                info!("The state: {:?}", state.states);
+                // for (key, val) in state.states.iter() {
+                //     info!("Address: {} has balance: {}, nonce: {}", key, val.1, val.0);
+                // }
 
                 (*spb).insert(block.hash(),&state);
                 (*blockchain).insert(&block);
@@ -246,8 +254,10 @@ impl Context {
                 self.server.broadcast(Message::NewBlockHashes(v));
                 counter += 1;
                 let encoded_block: Vec<u8> = bincode::serialize(&block).unwrap();
-                println!("!!!!!!!!!!!!!!!I did it! Counter: {:?}, Block size is: {:?}, Block contains {:?} transactions", counter, encoded_block.len(), transactions_num);
+                // println!("!!!!!!!!!!!!!!!I did it! Counter: {:?}, Block size is: {:?}, Block contains {:?} transactions", counter, encoded_block.len(), transactions_num);
+                println!("!!!!!!!!");
                 info!("Miner succeed !! Blockchain length: {:?}, Block tip: {:?}", blockchain.blocks.len(), (*blockchain).tip());
+                println!("!!!!!!!!");
                 //self.blockchain = Arc::new(Mutex::new(blockchain));
             }
 

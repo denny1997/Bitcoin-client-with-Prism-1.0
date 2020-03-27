@@ -73,6 +73,9 @@ impl Context {
         for i in 0..5 {
             record.insert(i,(0,1000));
         }
+        let duration = time::Duration::from_millis(5000);
+        thread::sleep(duration);
+        println!("Start Generator");
         loop {
             let duration = time::Duration::from_millis(2000);
             thread::sleep(duration);
@@ -142,7 +145,7 @@ impl Context {
             let mut broadcast_transactions_hashes = vec![];
             broadcast_transactions_hashes.push(signedT.clone().hash());
             self.server.broadcast(Message::NewTransactionHashes(broadcast_transactions_hashes));
-            println!("{:?}", record);
+            // println!("{:?}", record);
 
             
         }

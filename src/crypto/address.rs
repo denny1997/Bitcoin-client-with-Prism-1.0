@@ -18,6 +18,6 @@ impl std::convert::From<&[u8]> for H160 {
 
 impl std::fmt::Display for H160 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", std::str::from_utf8(&self.0[..]).unwrap().to_string())
+        write!(f, "H160({},{},{},{})", &self.0[0], &self.0[1], &self.0[2], &self.0[3])
     }
 }

@@ -118,6 +118,7 @@ impl Context {
                 }
                 Message::Transactions(transactions) => {
                     debug!("Transactions");
+                    info!("Receive one tx");
                     let mut broadcast_transactions_hashes = vec![];
                     // println!("1");
                     // println!("{:?}", blockchain.tip());
@@ -181,9 +182,9 @@ impl Context {
                     }
                     if b.len()>0{
                         peer.write(Message::Blocks(b));
-                        println!("Blockchain length: {:?}", blockchain.blocks.len());
-                        println!("Buffer length: {:?}", (*buffer).len());
-                        println!("Tip: {:?}", (*blockchain).tip());
+                        // println!("Blockchain length: {:?}", blockchain.blocks.len());
+                        // println!("Buffer length: {:?}", (*buffer).len());
+                        // println!("Tip: {:?}", (*blockchain).tip());
                     }
                     
                     
@@ -232,10 +233,11 @@ impl Context {
                                             // println!("22");
                                             if !state.addressCheck(&public_key[..]) {
                                                 state.insert(public_key[..].into(), 1000, 0);
-                                                info!("Offer 1000 coins to address {:?}", senderAddr);
+                                                info!("Offer 1000 coins to address {}", senderAddr);
                                             }
                                             if !state.states.contains_key(&recipientAddr){
                                                 state.insert(recipientAddr, 1000, 0);
+                                                info!("Offer 1000 coins to address {}", senderAddr);
                                             }
                                             // println!("23");
                                             if state.spendCheck(&public_key[..], value, accountNonce) {
@@ -264,9 +266,17 @@ impl Context {
                                             let repient = state.states[&recipientAddr];
                                             state.insert(senderAddr,(sender.1)-value, (sender.0)+1);
                                             state.insert(recipientAddr,(repient.1)+value, repient.0);
+                                            info!("{:} received {:?} coins from {:}", 
+                                                recipientAddr,
+                                                value,
+                                                senderAddr,
+                                            );
                                         }
 
-                                        info!("The state: {:?}", state.states);
+                                        // for (key, val) in state.states.iter() {
+                                        //     info!("Address: {} has balance: {}, nonce: {}", key, val.1, val.0);
+                                        // }
+
                                         // println!("3");
                                         // println!("{:?} hhh", block.hash());
                                         (*spb).insert(block.hash(),&state);
@@ -292,7 +302,7 @@ impl Context {
 
                                         let currentTime = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
                                         let durationSinceMined = currentTime - block.header.timestamp;
-                                        println!("!!!!!!!!!!!!!!!!!!!Latency: {:?}", durationSinceMined);
+                                        // println!("!!!!!!!!!!!!!!!!!!!Latency: {:?}", durationSinceMined);
                                         broadcast_blocks_hashes.push(block.clone().hash());
                                         let mut parent = block.hash();
                                         let difficulty = block.header.difficulty;
@@ -325,7 +335,11 @@ impl Context {
                                                 let senderAddr: H160 = public_key[..].into();
                                                 if !state.addressCheck(&public_key[..]) {
                                                     state.insert(public_key[..].into(), 1000, 0);
-                                                    info!("Offer 1000 coins to address {:?}", senderAddr);
+                                                    info!("Offer 1000 coins to address {}", senderAddr);
+                                                }
+                                                if !state.states.contains_key(&recipientAddr){
+                                                    state.insert(recipientAddr, 1000, 0);
+                                                    info!("Offer 1000 coins to address {}", senderAddr);
                                                 }
                                                 if state.spendCheck(&public_key[..], value, accountNonce) {
                                                     // let sender = state.states[&senderAddr];
@@ -348,9 +362,17 @@ impl Context {
                                                 let repient = state.states[&recipientAddr];
                                                 state.insert(senderAddr,(sender.1)-value, (sender.0)+1);
                                                 state.insert(recipientAddr,(repient.1)+value, repient.0);
+                                                info!("{:} received {:?} coins from {:}", 
+                                                recipientAddr,
+                                                value,
+                                                senderAddr,
+                                                );
                                             }
 
-                                            info!("The state: {:?}", state.states);
+                                            // info!("The state: {:?}", state.states);
+                                            // for (key, val) in state.states.iter() {
+                                            //     info!("Address: {} has balance: {}, nonce: {}", key, val.1, val.0);
+                                            // }
           
                                             (*spb).insert((*buffer)[&parent].hash(),&state);
                                             (*blockchain).insert(&(*buffer)[&parent]); 
@@ -387,10 +409,12 @@ impl Context {
                     if broadcast_blocks_hashes.len() > 0 {
                         self.server.broadcast(Message::NewBlockHashes(broadcast_blocks_hashes));
                     }
-                    println!("Blockchain length: {:?}", blockchain.blocks.len());
-                    println!("Buffer length: {:?}", (*buffer).len());
-                    println!("Tip: {:?}", (*blockchain).tip());
+                    // println!("Blockchain length: {:?}", blockchain.blocks.len());
+                    // println!("Buffer length: {:?}", (*buffer).len());
+                    // println!("Tip: {:?}", (*blockchain).tip());
+                    println!("!!!!!!!!");
                     info!("Blockchain length: {:?}, Block tip: {:?}", blockchain.blocks.len(), (*blockchain).tip());
+                    println!("!!!!!!!!");
                 }
             }
         }
