@@ -38,6 +38,8 @@ impl Blockchain {
         let h = self.height[&last];
         self.blocks.insert(block.hash(),Block{header:Header{parent:last,nonce:block.header.nonce,difficulty:block.header.difficulty,timestamp:block.header.timestamp,merkle_root:block.header.merkle_root},content:Content{data:(&block.content.data).to_vec()}});
         self.height.insert(block.hash(),h+1);
+        // The state of (tip of) longest chain is updated as longest chain grows. CODE
+        // The state is reverted when a fork becomes the new longest chain. CODE
         if h+1 > self.height[&self.last_block_of_longest_chain] {
             self.last_block_of_longest_chain = block.hash();
         }

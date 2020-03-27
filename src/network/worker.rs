@@ -13,6 +13,7 @@ use std::thread;
 use ring::signature::{Signature, KeyPair, Ed25519KeyPair};
 use crate::transaction::{verify,Mempool,State,StatePerBlock};
 use crate::crypto::address::H160;
+use log::info;
 
 #[derive(Clone)]
 pub struct Context {
@@ -191,6 +192,7 @@ impl Context {
                     // let ttt = blocks.clone();
                     // peer.write(Message::Blocks(ttt));
                     debug!("Blocks");
+                    info!("Receive one block");
                     let mut p = vec![];
                     let mut broadcast_blocks_hashes = vec![];
                     for block in blocks {
@@ -230,6 +232,7 @@ impl Context {
                                             // println!("22");
                                             if !state.addressCheck(&public_key[..]) {
                                                 state.insert(public_key[..].into(), 1000, 0);
+                                                info!("Offer 1000 coins to address {:?}", senderAddr);
                                             }
                                             if !state.states.contains_key(&recipientAddr){
                                                 state.insert(recipientAddr, 1000, 0);
@@ -262,6 +265,8 @@ impl Context {
                                             state.insert(senderAddr,(sender.1)-value, (sender.0)+1);
                                             state.insert(recipientAddr,(repient.1)+value, repient.0);
                                         }
+
+                                        info!("The state: {:?}", state.states);
                                         // println!("3");
                                         // println!("{:?} hhh", block.hash());
                                         (*spb).insert(block.hash(),&state);
@@ -320,6 +325,7 @@ impl Context {
                                                 let senderAddr: H160 = public_key[..].into();
                                                 if !state.addressCheck(&public_key[..]) {
                                                     state.insert(public_key[..].into(), 1000, 0);
+                                                    info!("Offer 1000 coins to address {:?}", senderAddr);
                                                 }
                                                 if state.spendCheck(&public_key[..], value, accountNonce) {
                                                     // let sender = state.states[&senderAddr];
@@ -343,6 +349,8 @@ impl Context {
                                                 state.insert(senderAddr,(sender.1)-value, (sender.0)+1);
                                                 state.insert(recipientAddr,(repient.1)+value, repient.0);
                                             }
+
+                                            info!("The state: {:?}", state.states);
           
                                             (*spb).insert((*buffer)[&parent].hash(),&state);
                                             (*blockchain).insert(&(*buffer)[&parent]); 
@@ -382,6 +390,7 @@ impl Context {
                     println!("Blockchain length: {:?}", blockchain.blocks.len());
                     println!("Buffer length: {:?}", (*buffer).len());
                     println!("Tip: {:?}", (*blockchain).tip());
+                    info!("Blockchain length: {:?}, Block tip: {:?}", blockchain.blocks.len(), (*blockchain).tip());
                 }
             }
         }

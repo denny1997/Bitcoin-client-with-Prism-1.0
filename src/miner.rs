@@ -108,6 +108,7 @@ impl Context {
 
     fn miner_loop(&mut self) {
         // main mining loop
+        info!("Miner start mining");
 
         let mut counter = 0;
         loop {
@@ -142,26 +143,24 @@ impl Context {
             let temp_spb = Arc::clone(&self.spb);
             let mut spb = temp_spb.lock().unwrap();
             let parent = blockchain.tip();
-            //println!("{:?}", parent);
             let timestamp:u128 = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
             let difficulty = blockchain.blocks[&parent].header.difficulty;
 
             let mut content:Vec<SignedTransaction> = vec![];
             let mut content_hash: Vec<H256> = vec![];
             let mempool_capacity = 16;
+
+            // Miner can put transactions into block content. CODE
             if mempool.transactions.len() <= mempool_capacity {
-                // println!("if");
                 for (h, t) in mempool.transactions.iter() {
                     content.push((*t).clone());
                     content_hash.push((*h).clone());
                 }
             } else {
-                // println!("else");
                 let mut num = 0;
                 for (h, t) in mempool.clone().transactions.iter() {
                     content.push((*t).clone());
                     content_hash.push((*h).clone());
-                    // (*mempool).transactions.remove(h);
                     num += 1;
                     if num == mempool_capacity {
                         break;
@@ -224,6 +223,7 @@ impl Context {
                     state.insert(senderAddr,(sender.1)-value, (sender.0)+1);
                     state.insert(recipientAddr,(repient.1)+value, repient.0);
                 }
+                info!("The state: {:?}", state.states);
 
                 (*spb).insert(block.hash(),&state);
                 (*blockchain).insert(&block);
@@ -247,7 +247,7 @@ impl Context {
                 counter += 1;
                 let encoded_block: Vec<u8> = bincode::serialize(&block).unwrap();
                 println!("!!!!!!!!!!!!!!!I did it! Counter: {:?}, Block size is: {:?}, Block contains {:?} transactions", counter, encoded_block.len(), transactions_num);
-
+                info!("Miner succeed !! Blockchain length: {:?}, Block tip: {:?}", blockchain.blocks.len(), (*blockchain).tip());
                 //self.blockchain = Arc::new(Mutex::new(blockchain));
             }
 

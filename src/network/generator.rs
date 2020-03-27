@@ -2,7 +2,7 @@ use super::message::Message;
 use super::peer;
 use crate::network::server::Handle as ServerHandle;
 use crossbeam::channel;
-use log::{debug, warn};
+use log::{debug, warn, info};
 use std::sync::{Arc, Mutex};
 use crate::blockchain::Blockchain;
 use crate::block::Block;
@@ -97,6 +97,7 @@ impl Context {
             let recipientNonce = record[&recipientIdx].0;
             let recipientBalance = record[&recipientIdx].1;
             let recipientPublicKey = (key_set[&recipientIdx]).public_key().as_ref();
+            let recipientPublicKey_hash_h160:H160 = recipientPublicKey.into();
 
             let mut currentBalance:u32 = 0;
             let mut nonce:u32 = 0;
@@ -123,8 +124,12 @@ impl Context {
             let value = rng.gen_range(0,cmp::min(10,currentBalance)) as u32;
             record.insert(senderIdx,(nonce, currentBalance-value));
             record.insert(recipientIdx, (recipientNonce,recipientBalance+value));
-
-
+            
+            info!("Generate one tx: {:?} sends {:?} coins to {:?}", 
+                senderPublicKey_hash_h160,
+                value,
+                recipientPublicKey_hash_h160
+            );
 
 
             let transaction = Transaction{recipientAddr: recipientPublicKey.into(), value: value, accountNonce: nonce};
