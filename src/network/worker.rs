@@ -208,6 +208,7 @@ impl Context {
                                     if block.header.difficulty == blockchain.blocks[&block.header.parent].header.difficulty {
                                         let contents = &(&block.clone()).content.data;
                                         let mut flag = false; 
+                                        // The state is reverted when a fork becomes the new longest chain. CODE
                                         let mut state = spb.spb[&block.header.parent].clone();
                                         let mut validTransaction = vec![];
 
@@ -219,6 +220,7 @@ impl Context {
                                             let signature = &signedTransaction.signature;
                                             let public_key = &signedTransaction.public_key;
                                             let transaction = &signedTransaction.transaction;
+                                            // Signature check CODE
                                             if !verify(transaction, public_key, signature) {
                                                 flag = true;    // invalid signature
                                                 break;

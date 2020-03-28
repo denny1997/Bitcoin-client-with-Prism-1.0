@@ -147,7 +147,7 @@ impl Context {
 
             let mut content:Vec<SignedTransaction> = vec![];
             let mut content_hash: Vec<H256> = vec![];
-            let mempool_capacity = 16;
+            let mempool_capacity = 8;
 
             // Miner can put transactions into block content. CODE
             if mempool.transactions.len() <= mempool_capacity {
