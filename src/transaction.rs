@@ -5,6 +5,7 @@ use ring::digest;
 use crate::crypto::hash::{H256, Hashable};
 use crate::crypto::address::H160;
 use std::collections::HashMap;
+use crate::block::{Block};
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct StatePerBlock {
@@ -26,13 +27,15 @@ impl StatePerBlock {
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct State {
     pub states: HashMap<H160,(u32,u32)>,
+    pub txBlockOrderedList: Vec<H256>,
 }
 
 impl State {
     
 	pub fn new() -> Self {
-	            let mut states: HashMap<H160,(u32,u32)> = HashMap::new();
-	            return State{states:states};
+                let mut states: HashMap<H160,(u32,u32)> = HashMap::new();
+                let mut txBlockOrderedList: Vec<H256> = Vec::new();
+	            return State{states:states, txBlockOrderedList:txBlockOrderedList};
 	}
 
     pub fn insert(&mut self, address: H160, balance: u32, nonce: u32) {
@@ -55,6 +58,22 @@ impl State {
         } else {
             return false;
         }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct TxBlockMempool {
+    pub txBlocks: HashMap<H256,Block>,
+}
+
+impl TxBlockMempool {
+    pub fn new() -> Self {
+        let mut txBlocks: HashMap<H256,Block> = HashMap::new();
+        return TxBlockMempool{txBlocks:txBlocks};
+    }
+
+    pub fn insert(&mut self, txBlock: &Block) {
+        self.txBlocks.insert(txBlock.hash(),txBlock.clone());
     }
 }
 

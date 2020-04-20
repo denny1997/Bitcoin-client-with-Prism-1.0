@@ -22,7 +22,7 @@ use std::time;
 
 use std::sync::{Arc, Mutex};
 use crate::blockchain::Blockchain;
-use crate::transaction::{Mempool, State, StatePerBlock};
+use crate::transaction::{Mempool, TxBlockMempool, State, StatePerBlock};
 use std::collections::HashMap;
 use crate::crypto::hash::{Hashable,H256};
 use crate::block::Block;
@@ -74,6 +74,8 @@ fn main() {
     let temp_blockchain = Blockchain::new();
     let mut blockchain = Arc::new(Mutex::new(temp_blockchain.clone()));
     let mut mempool = Arc::new(Mutex::new(Mempool::new()));
+    let mut txBlockmempool = Arc::new(Mutex::new(TxBlockMempool::new()));
+    let mut txBlockOrderedList = Arc::new(Mutex::new(Vec::new()));
     // let mut keys = vec![];
     let mut key_hashtable: HashMap<u32, Ed25519KeyPair>=HashMap::new();
     for i in 0..5 {
@@ -110,6 +112,8 @@ fn main() {
         &blockchain,
         &new_Hashmap,
         &mempool,
+        &txBlockmempool, 
+        &txBlockOrderedList,
         // &state,
         &spb,
     );
@@ -131,7 +135,7 @@ fn main() {
 
     // start the miner
     let (miner_ctx, miner) = miner::new(
-        &server, &blockchain, &mempool,&spb,
+        &server, &blockchain, &mempool, &txBlockmempool, &txBlockOrderedList, &spb,
     );
     miner_ctx.start();
 

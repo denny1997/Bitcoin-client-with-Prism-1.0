@@ -9,7 +9,8 @@ use crate::crypto::merkle::{MerkleTree};
 pub struct Header {
     pub parent:H256,
     pub nonce:u32,
-    pub difficulty:H256,
+    pub difficultyForPr:H256,
+    pub difficultyForTx:H256,
     pub timestamp:u128,
     pub merkle_root:H256
 }
@@ -28,8 +29,20 @@ pub struct Content {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TxPointer {
+    pub tp:Vec<H256>
+}
+
+// #[derive(Serialize, Deserialize, Debug, Clone)]
+// pub struct Block {
+//     pub header:Header,
+//     pub content:Content,
+// }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Block {
     pub header:Header,
+    pub txPointer:TxPointer,
     pub content:Content,
 }
 

@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::time::SystemTime;
 use std::thread;
 use ring::signature::{Signature, KeyPair, Ed25519KeyPair};
-use crate::transaction::{verify,Mempool,State,StatePerBlock};
+use crate::transaction::{verify,Mempool,TxBlockMempool,State,StatePerBlock};
 use crate::crypto::address::H160;
 use log::info;
 
@@ -23,6 +23,8 @@ pub struct Context {
     blockchain: Arc<Mutex<Blockchain>>,
     buffer: Arc<Mutex<HashMap<H256, Block>>>,
     mempool: Arc<Mutex<Mempool>>,
+    txBlockmempool: Arc<Mutex<TxBlockMempool>>,
+    txBlockOrderedList: Arc<Mutex<Vec<H256>>>,
     // state: Arc<Mutex<State>>,
     spb: Arc<Mutex<StatePerBlock>>,
 }
@@ -34,6 +36,8 @@ pub fn new(
     blockchain: &Arc<Mutex<Blockchain>>,
     hashMap: &Arc<Mutex<HashMap<H256, Block>>>,
     mempool: &Arc<Mutex<Mempool>>,
+    txBlockmempool: &Arc<Mutex<TxBlockMempool>>, 
+    txBlockOrderedList: &Arc<Mutex<Vec<H256>>>, 
     // state: &Arc<Mutex<State>>,
     spb: &Arc<Mutex<StatePerBlock>>,
 ) -> Context {
@@ -44,6 +48,8 @@ pub fn new(
         blockchain: Arc::clone(blockchain),
         buffer: Arc::clone(hashMap),
         mempool: Arc::clone(mempool),
+        txBlockmempool: Arc::clone(txBlockmempool),
+        txBlockOrderedList: Arc::clone(txBlockOrderedList),
         // state: Arc::clone(state),
         spb: Arc::clone(spb),
     }
@@ -73,7 +79,11 @@ impl Context {
             let temp_mempool = Arc::clone(&self.mempool);
             let mut mempool = temp_mempool.lock().unwrap();
             // println!("4");
+            let temp_txBlockmempool = Arc::clone(&self.txBlockmempool);
+            let mut txBlockmempool = temp_txBlockmempool.lock().unwrap();
 
+            let temp_txBlockOrderedList = Arc::clone(&self.txBlockOrderedList);
+            let mut txBlockOrderedList = temp_txBlockOrderedList.lock().unwrap();
             // let temp_state = Arc::clone(&self.state);
             // let mut state = temp_state.lock().unwrap();
 
@@ -156,8 +166,104 @@ impl Context {
                         self.server.broadcast(Message::NewTransactionHashes(broadcast_transactions_hashes));
                     }
                 }
-                Message::NewBlockHashes(hashes) => {
-                    debug!("NewBlockHashes");
+
+                Message::NewTxBlockHashes(hashes) => {
+                    debug!("NewTxBlockHashes");
+                    let mut h = vec![];
+                    for hash in hashes {
+                        if !txBlockmempool.txBlocks.contains_key(&hash) {
+                            h.push(hash);
+                        }
+                    }
+                    // let ttt = h.clone();
+                    if h.len()>0{
+                        // self.server.broadcast(Message::NewBlockHashes(ttt));
+                        peer.write(Message::GetTxBlocks(h));
+                    }
+                }
+
+                Message::GetTxBlocks(hashes) => {
+                    // let ttt = hashes.clone();
+                    // peer.write(Message::GetBlocks(ttt));
+                    debug!("GetTxBlocks");
+                    let mut b = vec![];
+                    for hash in hashes {
+                        if txBlockmempool.txBlocks.contains_key(&hash) {
+                            b.push(txBlockmempool.txBlocks[&hash].clone());
+                        }
+                    }
+                    if b.len()>0{
+                        peer.write(Message::TxBlocks(b));
+                        // println!("Blockchain length: {:?}", blockchain.blocks.len());
+                        // println!("Buffer length: {:?}", (*buffer).len());
+                        // println!("Tip: {:?}", (*blockchain).tip());
+                    }                   
+                }
+
+                Message::TxBlocks(blocks) => {
+                    debug!("TxBlocks");
+                    let mut broadcast_blocks_hashes = vec![];
+                    for block in blocks {
+                        // println!("1");
+                        if block.header.difficultyForTx >= block.hash() {
+                            if !txBlockmempool.txBlocks.contains_key(&block.hash()) {
+                                if (block.header.difficultyForTx == blockchain.blocks[&block.header.parent].header.difficultyForTx) && (block.header.difficultyForPr == blockchain.blocks[&block.header.parent].header.difficultyForPr) {
+                                    let contents = &(&block.clone()).content.data;
+                                    let mut flag = false; 
+
+                                    for signedTransaction in contents {
+                                        let signature = &signedTransaction.signature;
+                                        let public_key = &signedTransaction.public_key;
+                                        let transaction = &signedTransaction.transaction;
+                                        // Signature check CODE
+                                        if !verify(transaction, public_key, signature) {
+                                            flag = true;    // invalid signature
+                                            break;
+                                            println!("ooooooooops, something is not good!");
+                                        }
+
+                                    }
+                                    if flag {
+                                        break;
+                                    }
+
+                                    (*txBlockmempool).insert(&block);
+                                    (*txBlockOrderedList).push(block.hash());
+                                    
+                                    for t in contents{
+                                        let key = t.hash();
+                                        if (*mempool).transactions.contains_key(&key){
+                                            (*mempool).transactions.remove(&key);
+                                        }
+                                    }
+
+                                    for (key, value) in (*mempool).transactions.clone().iter() {
+                                        for t in contents {
+                                            if (t.public_key == value.public_key) && (t.transaction.accountNonce == value.transaction.accountNonce) {
+                                                (*mempool).transactions.remove(&key);
+                                            }
+                                        }
+                                    }
+
+                                    broadcast_blocks_hashes.push(block.clone().hash());
+                                }                        
+                            }
+                        }                       
+                    }
+
+                    if broadcast_blocks_hashes.len() > 0 {
+                        self.server.broadcast(Message::NewTxBlockHashes(broadcast_blocks_hashes));
+                    }
+                    // println!("Blockchain length: {:?}", blockchain.blocks.len());
+                    // println!("Buffer length: {:?}", (*buffer).len());
+                    // println!("Tip: {:?}", (*blockchain).tip());
+                    println!("???????");
+                    info!("Tx block received !! Blockchain length: {:?}, Block tip: {:?}", blockchain.blocks.len(), (*blockchain).tip());
+                    println!("???????");
+                }
+
+                Message::NewPrBlockHashes(hashes) => {
+                    debug!("NewPrBlockHashes");
                     let mut h = vec![];
                     for hash in hashes {
                         if !blockchain.blocks.contains_key(&hash) {
@@ -167,13 +273,13 @@ impl Context {
                     // let ttt = h.clone();
                     if h.len()>0{
                         // self.server.broadcast(Message::NewBlockHashes(ttt));
-                        peer.write(Message::GetBlocks(h));
+                        peer.write(Message::GetPrBlocks(h));
                     }
                 }
-                Message::GetBlocks(hashes) => {
+                Message::GetPrBlocks(hashes) => {
                     // let ttt = hashes.clone();
                     // peer.write(Message::GetBlocks(ttt));
-                    debug!("GetBlocks");
+                    debug!("GetPrBlocks");
                     let mut b = vec![];
                     for hash in hashes {
                         if blockchain.blocks.contains_key(&hash) {
@@ -181,7 +287,7 @@ impl Context {
                         }
                     }
                     if b.len()>0{
-                        peer.write(Message::Blocks(b));
+                        peer.write(Message::PrBlocks(b));
                         // println!("Blockchain length: {:?}", blockchain.blocks.len());
                         // println!("Buffer length: {:?}", (*buffer).len());
                         // println!("Tip: {:?}", (*blockchain).tip());
@@ -189,75 +295,83 @@ impl Context {
                     
                     
                 }
-                Message::Blocks(blocks) => {
+                Message::PrBlocks(blocks) => {
                     // let ttt = blocks.clone();
                     // peer.write(Message::Blocks(ttt));
-                    debug!("Blocks");
+                    debug!("PrBlocks");
                     info!("Receive one block");
                     let mut p = vec![];
                     let mut broadcast_blocks_hashes = vec![];
                     for block in blocks {
                         // println!("1");
-                        if block.header.difficulty >= block.hash() {
+                        if block.header.difficultyForPr >= block.hash() {
                             if !blockchain.blocks.contains_key(&block.hash()) {
                                 if !blockchain.blocks.contains_key(&block.header.parent){                                   
                                     (*buffer).insert(block.header.parent,block.clone());
                                     debug!("Parent not recieved yet");
                                     p.push(block.header.parent)                                                                     
                                 } else {
-                                    if block.header.difficulty == blockchain.blocks[&block.header.parent].header.difficulty {
-                                        let contents = &(&block.clone()).content.data;
+                                    if (block.header.difficultyForTx == blockchain.blocks[&block.header.parent].header.difficultyForTx) && (block.header.difficultyForPr == blockchain.blocks[&block.header.parent].header.difficultyForPr) {
                                         let mut flag = false; 
                                         // The state is reverted when a fork becomes the new longest chain. CODE
                                         let mut state = spb.spb[&block.header.parent].clone();
+                                        let mut orderList = spb.spb[&block.header.parent].txBlockOrderedList.clone();
+
                                         let mut validTransaction = vec![];
+                                        
+                                        let tp = block.txPointer.tp.clone();
 
-                                        for signedTransaction in contents {
-                                            // let signature: Signature = bincode::deserialize(&signedTransaction.signature[..]).unwrap();
-                                            // let public_key = ring::signature::UnparsedPublicKey::new(&signature::ED25519, signedTransaction.public_key);
-                                            // bincode::deserialize(&signedTransaction.public_key[..]).unwrap();
-                                            // let transaction = signedTransaction.transaction;
-                                            let signature = &signedTransaction.signature;
-                                            let public_key = &signedTransaction.public_key;
-                                            let transaction = &signedTransaction.transaction;
-                                            // Signature check CODE
-                                            if !verify(transaction, public_key, signature) {
-                                                flag = true;    // invalid signature
-                                                break;
-                                                println!("ooooooooops, something is not good!");
-                                            }
-                                            // println!("2");
-                                            let recipientAddr = transaction.recipientAddr;
-                                            let value = transaction.value;
-                                            let accountNonce = transaction.accountNonce;
-                                            // println!("21");
-                                            let senderAddr: H160 = public_key[..].into();
-                                            // println!("22");
-                                            if !state.addressCheck(&public_key[..]) {
-                                                state.insert(public_key[..].into(), 1000, 0);
-                                                info!("Offer 1000 coins to address {}", senderAddr);
-                                            }
-                                            if !state.states.contains_key(&recipientAddr){
-                                                state.insert(recipientAddr, 1000, 0);
-                                                info!("Offer 1000 coins to address {}", senderAddr);
-                                            }
-                                            // println!("23");
-                                            if state.spendCheck(&public_key[..], value, accountNonce) {
-                                                // println!("231");
-                                                // let sender = state.states[&senderAddr];
-                                                // // println!("2311");
-                                                // let repient = state.states[&recipientAddr];
-                                                // // println!("232");
-                                                // state.insert(senderAddr,(sender.1)-value, (sender.0)+1);
-                                                // state.insert(recipientAddr,(repient.1)+value, repient.0);
-                                                validTransaction.push(signedTransaction);
-                                            }
-                                            // println!("24");
+                                        for txpointer in tp {
+                                            if !orderList.contains(&txpointer) {
+                                                state.txBlockOrderedList.push(txpointer);
+                                                if txBlockmempool.txBlocks.contains_key(&txpointer) {
+                                                    let txBlk = txBlockmempool.txBlocks[&txpointer].clone();
+                                                    let contents = txBlk.content.data;
 
+                                                    for signedTransaction in contents {
+                                                        let signature = &signedTransaction.signature;
+                                                        let public_key = &signedTransaction.public_key;
+                                                        let transaction = &signedTransaction.transaction;
+                                                        // Signature check CODE
+                                                        if !verify(transaction, public_key, signature) {
+                                                            flag = true;    // invalid signature
+                                                            break;
+                                                            println!("ooooooooops, something is not good!");
+                                                        }
+                                                        let recipientAddr = transaction.recipientAddr;
+                                                        let value = transaction.value;
+                                                        let accountNonce = transaction.accountNonce;
+
+                                                        let senderAddr: H160 = public_key[..].into();
+
+                                                        if !state.addressCheck(&public_key[..]) {
+                                                            state.insert(public_key[..].into(), 1000, 0);
+                                                            info!("Offer 1000 coins to address {}", senderAddr);
+                                                        }
+                                                        if !state.states.contains_key(&recipientAddr){
+                                                            state.insert(recipientAddr, 1000, 0);
+                                                            info!("Offer 1000 coins to address {}", senderAddr);
+                                                        }
+
+                                                        if state.spendCheck(&public_key[..], value, accountNonce) {
+                                                            validTransaction.push(signedTransaction);
+                                                        }
+                
+                                                    }
+                                                    if flag {
+                                                        break;
+                                                    }
+                                                }
+                                                else {
+                                                    println!("Fatal error!");
+                                                }                                               
+                                            }                      
                                         }
+
                                         if flag {
                                             break;
-                                        }
+                                        }                                        
+                                      
                                         for vt in validTransaction {
                                             let public_key = &vt.public_key;
                                             let transaction = &vt.transaction;
@@ -275,85 +389,82 @@ impl Context {
                                             );
                                         }
 
-                                        // for (key, val) in state.states.iter() {
-                                        //     info!("Address: {} has balance: {}, nonce: {}", key, val.1, val.0);
-                                        // }
-
-                                        // println!("3");
-                                        // println!("{:?} hhh", block.hash());
                                         (*spb).insert(block.hash(),&state);
-                                        // println!("123");
-                                        (*blockchain).insert(&block);
-                                        // println!("4");
-                                        for t in contents{
-                                            let key = t.hash();
-                                            if (*mempool).transactions.contains_key(&key){
-                                                (*mempool).transactions.remove(&key);
-                                            }
-                                        }
-                                        // println!("5");
-                                        for (key, value) in (*mempool).transactions.clone().iter() {
-                                            for t in contents {
-                                                if (t.public_key == value.public_key) && (t.transaction.accountNonce == value.transaction.accountNonce) {
-                                                    (*mempool).transactions.remove(&key);
-                                                }
-                                            }
-                                        }
-                                        // println!("6");
+                                        (*blockchain).insert(&block);                                      
 
-
-                                        let currentTime = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
-                                        let durationSinceMined = currentTime - block.header.timestamp;
+                                        // let currentTime = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
+                                        // let durationSinceMined = currentTime - block.header.timestamp;
                                         // println!("!!!!!!!!!!!!!!!!!!!Latency: {:?}", durationSinceMined);
                                         broadcast_blocks_hashes.push(block.clone().hash());
                                         let mut parent = block.hash();
-                                        let difficulty = block.header.difficulty;
+                                        let difficultyForPr = block.header.difficultyForPr;
+                                        let difficultyForTx = block.header.difficultyForTx;
                                         let mut temp;
                                         while (*buffer).contains_key(&parent) {
                                             println!("stucked! TAT");
-                                            if (*buffer)[&parent].header.difficulty != difficulty {
+                                            if ((*buffer)[&parent].header.difficultyForPr != difficultyForPr) || ((*buffer)[&parent].header.difficultyForTx != difficultyForTx) {
                                                 break;
                                             }
-                                            let contents = &((*buffer)[&parent].clone()).content.data;
-                                            let mut flag = false;
+                                            let mut flag = false; 
+                                            // The state is reverted when a fork becomes the new longest chain. CODE
                                             let mut state = spb.spb[&parent].clone();
+                                            let mut orderList = spb.spb[&parent].txBlockOrderedList.clone();
+
                                             let mut validTransaction = vec![];
-                                            for signedTransaction in contents {
-                                                // let signature: Signature = bincode::deserialize(&signedTransaction.signature[..]).unwrap();
-                                                // let public_key = ring::signature::UnparsedPublicKey::new(&signature::ED25519, signedTransaction.public_key);
-                                                // bincode::deserialize(&signedTransaction.public_key[..]).unwrap();
-                                                // let transaction = signedTransaction.transaction;
-                                                let signature = &signedTransaction.signature;
-                                                let public_key = &signedTransaction.public_key;
-                                                let transaction = &signedTransaction.transaction;
-                                                if !verify(transaction, public_key, signature) {
-                                                    flag = true;    // invalid signature
-                                                    println!("ooooooooops, something is not good!");
-                                                    break;
-                                                }
-                                                let recipientAddr = transaction.recipientAddr;
-                                                let value = transaction.value;
-                                                let accountNonce = transaction.accountNonce;
-                                                let senderAddr: H160 = public_key[..].into();
-                                                if !state.addressCheck(&public_key[..]) {
-                                                    state.insert(public_key[..].into(), 1000, 0);
-                                                    info!("Offer 1000 coins to address {}", senderAddr);
-                                                }
-                                                if !state.states.contains_key(&recipientAddr){
-                                                    state.insert(recipientAddr, 1000, 0);
-                                                    info!("Offer 1000 coins to address {}", senderAddr);
-                                                }
-                                                if state.spendCheck(&public_key[..], value, accountNonce) {
-                                                    // let sender = state.states[&senderAddr];
-                                                    // let repient = state.states[&recipientAddr];
-                                                    // state.insert(senderAddr,(sender.1)-value, (sender.0)+1,);
-                                                    // state.insert(recipientAddr,(repient.1)+value, repient.0);
-                                                    validTransaction.push(signedTransaction);
-                                                }
+                                            
+                                            let tp = &((*buffer)[&parent].clone()).txPointer.tp.clone();
+
+                                            for txpointer in tp {
+                                                if !orderList.contains(&txpointer) {
+                                                    state.txBlockOrderedList.push(*txpointer);
+                                                    if txBlockmempool.txBlocks.contains_key(&txpointer) {
+                                                        let txBlk = txBlockmempool.txBlocks[&txpointer].clone();
+                                                        let contents = txBlk.content.data;
+
+                                                        for signedTransaction in contents {
+                                                            let signature = &signedTransaction.signature;
+                                                            let public_key = &signedTransaction.public_key;
+                                                            let transaction = &signedTransaction.transaction;
+                                                            // Signature check CODE
+                                                            if !verify(transaction, public_key, signature) {
+                                                                flag = true;    // invalid signature
+                                                                break;
+                                                                println!("ooooooooops, something is not good!");
+                                                            }
+                                                            let recipientAddr = transaction.recipientAddr;
+                                                            let value = transaction.value;
+                                                            let accountNonce = transaction.accountNonce;
+
+                                                            let senderAddr: H160 = public_key[..].into();
+
+                                                            if !state.addressCheck(&public_key[..]) {
+                                                                state.insert(public_key[..].into(), 1000, 0);
+                                                                info!("Offer 1000 coins to address {}", senderAddr);
+                                                            }
+                                                            if !state.states.contains_key(&recipientAddr){
+                                                                state.insert(recipientAddr, 1000, 0);
+                                                                info!("Offer 1000 coins to address {}", senderAddr);
+                                                            }
+
+                                                            if state.spendCheck(&public_key[..], value, accountNonce) {
+                                                                validTransaction.push(signedTransaction);
+                                                            }
+                    
+                                                        }
+                                                        if flag {
+                                                            break;
+                                                        }
+                                                    }
+                                                    else {
+                                                        println!("Fatal error!");
+                                                    }                                               
+                                                }                      
                                             }
+
                                             if flag {
                                                 break;
-                                            }
+                                            }                                        
+                                        
                                             for vt in validTransaction {
                                                 let public_key = &vt.public_key;
                                                 let transaction = &vt.transaction;
@@ -365,36 +476,15 @@ impl Context {
                                                 state.insert(senderAddr,(sender.1)-value, (sender.0)+1);
                                                 state.insert(recipientAddr,(repient.1)+value, repient.0);
                                                 info!("{:} received {:?} coins from {:}", 
-                                                recipientAddr,
-                                                value,
-                                                senderAddr,
+                                                    recipientAddr,
+                                                    value,
+                                                    senderAddr,
                                                 );
                                             }
-
-                                            // info!("The state: {:?}", state.states);
-                                            // for (key, val) in state.states.iter() {
-                                            //     info!("Address: {} has balance: {}, nonce: {}", key, val.1, val.0);
-                                            // }
           
                                             (*spb).insert((*buffer)[&parent].hash(),&state);
                                             (*blockchain).insert(&(*buffer)[&parent]); 
-
-                                            for t in contents{
-                                                let key = t.hash();
-                                                if (*mempool).transactions.contains_key(&key){
-                                                    (*mempool).transactions.remove(&key);
-                                                }
-                                            }
-
-                                            for (key, value) in (*mempool).transactions.clone().iter() {
-                                                for t in contents {
-                                                    if (t.public_key == value.public_key) && (t.transaction.accountNonce == value.transaction.accountNonce) {
-                                                        (*mempool).transactions.remove(&key);
-                                                    }
-                                                }
-                                            }
-    
-
+                               
                                             broadcast_blocks_hashes.push(((*buffer)[&parent]).clone().hash());                         
                                             temp = (*buffer)[&parent].hash();
                                             (*buffer).remove(&parent);
@@ -405,17 +495,15 @@ impl Context {
                             }
                         }                       
                     }
-                    // if p.len() > 0 {
-                    //     peer.write(Message::GetBlocks(p));
-                    // }
+
                     if broadcast_blocks_hashes.len() > 0 {
-                        self.server.broadcast(Message::NewBlockHashes(broadcast_blocks_hashes));
+                        self.server.broadcast(Message::NewPrBlockHashes(broadcast_blocks_hashes));
                     }
                     // println!("Blockchain length: {:?}", blockchain.blocks.len());
                     // println!("Buffer length: {:?}", (*buffer).len());
                     // println!("Tip: {:?}", (*blockchain).tip());
                     println!("!!!!!!!!");
-                    info!("Blockchain length: {:?}, Block tip: {:?}", blockchain.blocks.len(), (*blockchain).tip());
+                    info!("Pr block received !! Blockchain length: {:?}, Block tip: {:?}", blockchain.blocks.len(), (*blockchain).tip());
                     println!("!!!!!!!!");
                 }
             }
