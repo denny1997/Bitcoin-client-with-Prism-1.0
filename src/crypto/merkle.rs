@@ -119,6 +119,93 @@ impl MerkleTree {
         // return MerkleTree{hash_idx:hash_index};
     }
 
+
+
+pub fn new1<T>(data: &[T], txPointer: &[H256]) -> Self where T: Hashable {
+        let leaf_size = data.len() + txPointer.len();
+        // let mut temp: Vec<MerkleNode> = [].to_vec();
+        let mut temp: Vec<H256> = [].to_vec();
+        // let mut high: Vec<MerkleNode> = [].to_vec();
+        if leaf_size == 0{
+            let fake_data: H256 = (b"00000000000000000000000000000000").into();
+            temp.push(fake_data);
+        }
+        else if leaf_size == 1 {
+            if data.len() == 1{
+                temp.push(data[0].hash());
+            }
+            else{
+                temp.push(txPointer[0].hash());
+            }
+            
+        }
+        else{
+            for count in 0..data.len() {
+                // temp.push(MerkleNode{value: data[count].hash(), l: None, r: None});
+                temp.push(data[count].hash());
+            }
+            for count in 0..txPointer.len() {
+                // temp.push(MerkleNode{value: data[count].hash(), l: None, r: None});
+                temp.push(txPointer[count].hash());
+            }
+            // duplicate
+            let mut count = 1usize;
+            loop{
+                if count < leaf_size{
+                    count *= 2;
+                }
+                else{
+                    break;
+                }
+            }
+            while temp.len() < count {
+                let left_length = temp.len() - count/2;  //1
+                let mut inner_count = 2usize;
+                loop{
+                    if inner_count < left_length{
+                        inner_count *= 2;
+                    }
+                    else{
+                        break;
+                    }
+                }
+                let mut append_length = 0;
+                if inner_count == left_length{
+                    append_length = inner_count;
+                }
+                else{
+                    append_length = inner_count - left_length;
+                }
+                let mut appendVec: Vec<H256> = [].to_vec();
+                // for idx in (count/2)..(count/2 + append_length){
+                for idx in (temp.len()-append_length)..(temp.len()){
+                    appendVec.push(temp[idx]);
+                }
+                temp.extend(appendVec.iter().copied());
+            }
+            // after duplicate
+            let mut level_len = temp.len();
+            let mut anchor = 0;
+            while level_len > 1 {
+                for idx in 0..(level_len/2){
+                    let mut ctx = digest::Context::new(&digest::SHA256);
+                    ctx.update(&(<[u8; 32]>::from(temp[2*idx+anchor])));
+                    ctx.update(&(<[u8; 32]>::from(temp[2*idx+anchor+1])));
+                    let multi_part = ctx.finish();
+                    temp.push(<H256>::from(multi_part));
+                }
+                anchor += level_len;
+                level_len /= 2;
+            }
+        }
+        let tree_root = temp[temp.len()-1];
+        let tree = MerkleTree{hash_idx: temp};
+        tree
+        // unimplemented!()
+    }
+
+
+
     pub fn root(&self) -> H256 {
         if self.hash_idx.len() == 0{
             return (b"00000000000000000000000000000000").into();

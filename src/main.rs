@@ -41,6 +41,7 @@ fn main() {
      (@arg known_peer: -c --connect ... [PEER] "Sets the peers to connect to at start")
      (@arg p2p_workers: --("p2p-workers") [INT] default_value("4") "Sets the number of worker threads for P2P server")
      (@arg generate: -g --("generator") [INT] default_value("0") "Sets generator status")
+     (@arg attack: -a --("attacker") [INT] default_value("0") "Sets attacker status, 0: no attack, 1: spamming attack, 2: cencorship attack, 3: both attacks")
     )
     .get_matches();
 
@@ -121,6 +122,7 @@ fn main() {
 
 
     if Some("1") == matches.value_of("generate") {
+        let attack = matches.value_of("attack").unwrap().parse::<usize>().unwrap();
         // start the transaction generator
         let generator = generator::new(
             1,
@@ -128,6 +130,7 @@ fn main() {
             &mempool,
             &state,
             &key_set,
+            attack,
         );
         generator.start();
     }
