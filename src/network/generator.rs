@@ -31,6 +31,7 @@ pub struct Context {
     // keyPairs: Vec<Ed25519KeyPair>,
     state: Arc<Mutex<State>>,
     key_set: Arc<Mutex<HashMap<u32, Ed25519KeyPair>>>,
+    attacker: usize,
 }
 
 pub fn new(
@@ -42,6 +43,7 @@ pub fn new(
     // keyPairs: Vec<Ed25519KeyPair>,
     state: &Arc<Mutex<State>>,
     key_set: &Arc<Mutex<HashMap<u32, Ed25519KeyPair>>>,
+    attacker: usize,
 ) -> Context {
     Context {
         // msg_chan: msg_src,
@@ -53,6 +55,7 @@ pub fn new(
         // keyPairs: keyPairs.clone(),
         state: Arc::clone(state),
         key_set: Arc::clone(key_set),
+        attacker,
     }
 }
 
@@ -69,6 +72,15 @@ impl Context {
     }
 
     fn worker_loop(&mut self) {
+        if self.attacker == 1 {
+            println!("Spamming attack");
+        }
+        else if self.attacker == 2{
+            println!("Censorship attack");
+        }
+        else {
+            println!("No attack");
+        }
         let mut record: HashMap<u32, (u32, u32)> = HashMap::new();
         for i in 0..5 {
             record.insert(i,(0,1000));
@@ -123,10 +135,17 @@ impl Context {
             //     maxvalue = 1000;
             //     nonce = 1;
             // }
-
-            let value = rng.gen_range(0,cmp::min(10,currentBalance)) as u32;
-            record.insert(senderIdx,(nonce, currentBalance-value));
-            record.insert(recipientIdx, (recipientNonce,recipientBalance+value));
+            let mut value = 0;
+            if self.attacker == 1{
+                value = 1000;
+            }
+            else{
+                value = rng.gen_range(0,cmp::min(10,currentBalance)) as u32;
+                record.insert(senderIdx,(nonce, currentBalance-value));
+                record.insert(recipientIdx, (recipientNonce,recipientBalance+value));
+            }
+            
+            
             
             info!("Generate one tx: {:} sends {:?} coins to {:}", 
                 senderPublicKey_hash_h160,
