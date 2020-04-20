@@ -195,7 +195,7 @@ impl Context {
             let txPointer = TxPointer{tp:tp.clone()};
 
             // println!("{:?}!!!!!!!!!!!!!!!!!{:?}", content.len(), mempool.transactions.len());
-            let root = MerkleTree::new(&content).root();
+            let root = MerkleTree::new1(&content, &tp).root();
             // println!("!!!!!!!yes!!!!!");
             let mut rng = rand::thread_rng();
             let nonce: u32 = rng.gen();
