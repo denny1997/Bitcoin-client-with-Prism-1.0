@@ -42,6 +42,7 @@ pub struct Context {
     txBlockmempool: Arc<Mutex<TxBlockMempool>>,
     txBlockOrderedList: Arc<Mutex<Vec<H256>>>,
     spb: Arc<Mutex<StatePerBlock>>,
+    attack: usize,
 }
 
 #[derive(Clone)]
@@ -57,6 +58,7 @@ pub fn new(
     txBlockmempool: &Arc<Mutex<TxBlockMempool>>, 
     txBlockOrderedList: &Arc<Mutex<Vec<H256>>>, 
     spb: &Arc<Mutex<StatePerBlock>>,
+    attack: usize,
 ) -> (Context, Handle) {
     let (signal_chan_sender, signal_chan_receiver) = unbounded();
 
@@ -69,6 +71,7 @@ pub fn new(
         txBlockmempool: Arc::clone(txBlockmempool),
         txBlockOrderedList: Arc::clone(txBlockOrderedList),
         spb: Arc::clone(spb),
+        attack,
     };
 
     let handle = Handle {
@@ -119,8 +122,10 @@ impl Context {
         // main mining loop
 
         let mut counter = 0;
+
         loop {
             // check and react to control signals
+            
             match self.operating_state {
                 OperatingState::Paused => {
                     let signal = self.control_chan.recv().unwrap();
@@ -141,7 +146,9 @@ impl Context {
             if let OperatingState::ShutDown = self.operating_state {
                 return;
             }
-            
+            counter = counter % 100000;
+            counter += 1;
+            // println!("{:?}", counter);
             // TODO: actual mining
             let temp = Arc::clone(&self.blockchain);
             let mut blockchain = temp.lock().unwrap();
@@ -208,128 +215,213 @@ impl Context {
                                     };
             let content:Content = Content{data:content};
             let block: Block = Block{header: header, txPointer: txPointer, content: content.clone()};
+            
             // println!("Mempool length: {:?}", (*mempool).transactions.len());
-            if block.hash()<= difficultyForPr {
-                //Arc::make_mut(&mut self.blockchain).get_mut().unwrap().insert(&block);
-                let mut state = spb.spb[&block.header.parent].clone();
-                let mut validTransaction = vec![];
-                // let contents = &(&block.clone()).content.data;
-                for txpointer in tp.clone() {
-                    let txBlk = txBlockmempool.txBlocks[&txpointer].clone();
-                    let contents = txBlk.content.data;
-                    for signedTransaction in contents {
-                        let signature = &signedTransaction.signature;
-                        let public_key = &signedTransaction.public_key;
-                        let transaction = &signedTransaction.transaction;
-    
-                        // println!("2");
+            if self.attack != 2 {
+                if block.hash()<= difficultyForPr {
+                    //Arc::make_mut(&mut self.blockchain).get_mut().unwrap().insert(&block);
+                    let mut state = spb.spb[&block.header.parent].clone();
+                    let mut validTransaction = vec![];
+                    // let contents = &(&block.clone()).content.data;
+                    for txpointer in tp.clone() {
+                        let txBlk = txBlockmempool.txBlocks[&txpointer].clone();
+                        let contents = txBlk.content.data;
+                        for signedTransaction in contents {
+                            let signature = &signedTransaction.signature;
+                            let public_key = &signedTransaction.public_key;
+                            let transaction = &signedTransaction.transaction;
+        
+                            // println!("2");
+                            let recipientAddr = transaction.recipientAddr;
+                            let value = transaction.value;
+                            let accountNonce = transaction.accountNonce;
+                            // println!("21");
+                            let senderAddr: H160 = public_key[..].into();
+                            // println!("22");
+                            if !state.addressCheck(&public_key[..]) {
+                                state.insert(public_key[..].into(), 1000, 0);
+                                info!("Offer 1000 coins to address {}", senderAddr);
+                            }
+                            if !state.states.contains_key(&recipientAddr){
+                                state.insert(recipientAddr, 1000, 0);
+                                info!("Offer 1000 coins to address {}", senderAddr);
+                            }
+                            // println!("23");
+                            if state.spendCheck(&public_key[..], value, accountNonce) {
+                                // println!("231");
+                                // let sender = state.states[&senderAddr];
+                                // // println!("2311");
+                                // let repient = state.states[&recipientAddr];
+                                // // println!("232");
+                                // state.insert(senderAddr,(sender.1)-value, (sender.0)+1);
+                                // state.insert(recipientAddr,(repient.1)+value, repient.0);
+                                validTransaction.push(signedTransaction);
+                            }
+                        }
+                    }
+                    
+                    
+                    for vt in validTransaction {
+                        let public_key = &vt.public_key;
+                        let transaction = &vt.transaction;
                         let recipientAddr = transaction.recipientAddr;
-                        let value = transaction.value;
-                        let accountNonce = transaction.accountNonce;
-                        // println!("21");
                         let senderAddr: H160 = public_key[..].into();
-                        // println!("22");
-                        if !state.addressCheck(&public_key[..]) {
-                            state.insert(public_key[..].into(), 1000, 0);
-                            info!("Offer 1000 coins to address {}", senderAddr);
-                        }
-                        if !state.states.contains_key(&recipientAddr){
-                            state.insert(recipientAddr, 1000, 0);
-                            info!("Offer 1000 coins to address {}", senderAddr);
-                        }
-                        // println!("23");
-                        if state.spendCheck(&public_key[..], value, accountNonce) {
-                            // println!("231");
-                            // let sender = state.states[&senderAddr];
-                            // // println!("2311");
-                            // let repient = state.states[&recipientAddr];
-                            // // println!("232");
-                            // state.insert(senderAddr,(sender.1)-value, (sender.0)+1);
-                            // state.insert(recipientAddr,(repient.1)+value, repient.0);
-                            validTransaction.push(signedTransaction);
+                        let value = transaction.value;
+                        let sender = state.states[&senderAddr];
+                        let repient = state.states[&recipientAddr];
+                        state.insert(senderAddr,(sender.1)-value, (sender.0)+1);
+                        state.insert(recipientAddr,(repient.1)+value, repient.0);
+                        info!("{:} received {:?} coins from {:}", 
+                            recipientAddr,
+                            value,
+                            senderAddr,
+                        );
+                    }
+                    // for (key, val) in state.states.iter() {
+                    //     info!("Address: {} has balance: {}, nonce: {}", key, val.1, val.0);
+                    // }
+                    for txpointer in tp.clone() {
+                        state.txBlockOrderedList.push(txpointer);
+                    }
+
+                    (*spb).insert(block.hash(),&state);
+                    (*blockchain).insert(&block);
+                    // for key in content_hash.clone(){
+                    //     (*mempool).transactions.remove(&key);
+                    // }
+
+                    // for (key, value) in (*mempool).transactions.clone().iter() {
+                    //     for t in contents {
+                    //         if (t.public_key == value.public_key) && (t.transaction.accountNonce == value.transaction.accountNonce) {
+                    //             (*mempool).transactions.remove(&key);
+                    //         }
+                    //     }
+                    // }
+                    // let transactions_num = content_hash.len();
+                    // let currentTime = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
+                    // let durationSinceMined = currentTime - block.header.timestamp;
+                    let mut v = vec![];
+                    v.push(block.hash());
+                    self.server.broadcast(Message::NewPrBlockHashes(v));
+                    // counter += 1;
+                    // let encoded_block: Vec<u8> = bincode::serialize(&block).unwrap();
+                    // println!("!!!!!!!!!!!!!!!I did it! Counter: {:?}, Block size is: {:?}, Block contains {:?} transactions", counter, encoded_block.len(), transactions_num);
+                    println!("!!!!!!!!");
+                    info!("Pr block succeed !! Blockchain length: {:?}, Block tip: {:?}", blockchain.blocks.len(), (*blockchain).tip());
+                    // println!("!!!!!!!!");
+                    //self.blockchain = Arc::new(Mutex::new(blockchain));
+                }
+                else if block.hash()<= difficultyForTx {
+                    (*txBlockmempool).insert(&block);
+                    (*txBlockOrderedList).push(block.hash());
+
+                    for key in content_hash.clone(){
+                        (*mempool).transactions.remove(&key);
+                    }
+
+                    for (key, value) in (*mempool).transactions.clone().iter() {
+                        for t in &content.data {
+                            if (t.public_key == value.public_key) && (t.transaction.accountNonce == value.transaction.accountNonce) {
+                                (*mempool).transactions.remove(&key);
+                            }
                         }
                     }
+                    // let transactions_num = content_hash.len();
+                    // let currentTime = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
+                    // let durationSinceMined = currentTime - block.header.timestamp;
+                    let mut v = vec![];
+                    v.push(block.hash());
+                    self.server.broadcast(Message::NewTxBlockHashes(v));
+                    // counter += 1;
+                    // let encoded_block: Vec<u8> = bincode::serialize(&block).unwrap();
+                    // println!("!!!!!!!!!!!!!!!I did it! Counter: {:?}, Block size is: {:?}, Block contains {:?} transactions", counter, encoded_block.len(), transactions_num);
+                    println!("????????");
+                    // info!("Tx block succeed !! Blockchain length: {:?}, Block tip: {:?}", blockchain.blocks.len(), (*blockchain).tip());
+                    info!("Tx block succeed !! TxBlock contains {:?} transactions", block.content.data.len());
+                    // println!("????????");
                 }
-                
-                
-                for vt in validTransaction {
-                    let public_key = &vt.public_key;
-                    let transaction = &vt.transaction;
-                    let recipientAddr = transaction.recipientAddr;
-                    let senderAddr: H160 = public_key[..].into();
-                    let value = transaction.value;
-                    let sender = state.states[&senderAddr];
-                    let repient = state.states[&recipientAddr];
-                    state.insert(senderAddr,(sender.1)-value, (sender.0)+1);
-                    state.insert(recipientAddr,(repient.1)+value, repient.0);
-                    info!("{:} received {:?} coins from {:}", 
-                        recipientAddr,
-                        value,
-                        senderAddr,
-                    );
-                }
-                // for (key, val) in state.states.iter() {
-                //     info!("Address: {} has balance: {}, nonce: {}", key, val.1, val.0);
-                // }
-                for txpointer in tp.clone() {
-                    state.txBlockOrderedList.push(txpointer);
-                }
-
-                (*spb).insert(block.hash(),&state);
-                (*blockchain).insert(&block);
-                // for key in content_hash.clone(){
-                //     (*mempool).transactions.remove(&key);
-                // }
-
-                // for (key, value) in (*mempool).transactions.clone().iter() {
-                //     for t in contents {
-                //         if (t.public_key == value.public_key) && (t.transaction.accountNonce == value.transaction.accountNonce) {
-                //             (*mempool).transactions.remove(&key);
-                //         }
-                //     }
-                // }
-                // let transactions_num = content_hash.len();
-                // let currentTime = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
-                // let durationSinceMined = currentTime - block.header.timestamp;
-                let mut v = vec![];
-                v.push(block.hash());
-                self.server.broadcast(Message::NewPrBlockHashes(v));
-                // counter += 1;
-                // let encoded_block: Vec<u8> = bincode::serialize(&block).unwrap();
-                // println!("!!!!!!!!!!!!!!!I did it! Counter: {:?}, Block size is: {:?}, Block contains {:?} transactions", counter, encoded_block.len(), transactions_num);
-                println!("!!!!!!!!");
-                info!("Pr block succeed !! Blockchain length: {:?}, Block tip: {:?}", blockchain.blocks.len(), (*blockchain).tip());
-                println!("!!!!!!!!");
-                //self.blockchain = Arc::new(Mutex::new(blockchain));
-            } 
-            else if block.hash()<= difficultyForTx {
-                (*txBlockmempool).insert(&block);
-                (*txBlockOrderedList).push(block.hash());
-
-                for key in content_hash.clone(){
-                    (*mempool).transactions.remove(&key);
-                }
-
-                for (key, value) in (*mempool).transactions.clone().iter() {
-                    for t in &content.data {
-                        if (t.public_key == value.public_key) && (t.transaction.accountNonce == value.transaction.accountNonce) {
-                            (*mempool).transactions.remove(&key);
-                        }
-                    }
-                }
-                // let transactions_num = content_hash.len();
-                // let currentTime = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
-                // let durationSinceMined = currentTime - block.header.timestamp;
-                let mut v = vec![];
-                v.push(block.hash());
-                self.server.broadcast(Message::NewTxBlockHashes(v));
-                // counter += 1;
-                // let encoded_block: Vec<u8> = bincode::serialize(&block).unwrap();
-                // println!("!!!!!!!!!!!!!!!I did it! Counter: {:?}, Block size is: {:?}, Block contains {:?} transactions", counter, encoded_block.len(), transactions_num);
-                println!("????????");
-                info!("Tx block succeed !! Blockchain length: {:?}, Block tip: {:?}", blockchain.blocks.len(), (*blockchain).tip());
-                println!("????????");
             }
+            else{
+                if counter % 1000 == 0 {
+                    let mut state = spb.spb[&block.header.parent].clone();
+                    let mut validTransaction = vec![];
+                    // let contents = &(&block.clone()).content.data;
+                    for txpointer in tp.clone() {
+                        let txBlk = txBlockmempool.txBlocks[&txpointer].clone();
+                        let contents = txBlk.content.data;
+                        for signedTransaction in contents {
+                            let signature = &signedTransaction.signature;
+                            let public_key = &signedTransaction.public_key;
+                            let transaction = &signedTransaction.transaction;
+        
+                            // println!("2");
+                            let recipientAddr = transaction.recipientAddr;
+                            let value = transaction.value;
+                            let accountNonce = transaction.accountNonce;
+                            // println!("21");
+                            let senderAddr: H160 = public_key[..].into();
+                            // println!("22");
+                            if !state.addressCheck(&public_key[..]) {
+                                state.insert(public_key[..].into(), 1000, 0);
+                                info!("Offer 1000 coins to address {}", senderAddr);
+                            }
+                            if !state.states.contains_key(&recipientAddr){
+                                state.insert(recipientAddr, 1000, 0);
+                                info!("Offer 1000 coins to address {}", senderAddr);
+                            }
+                            // println!("23");
+                            if state.spendCheck(&public_key[..], value, accountNonce) {
+                                // println!("231");
+                                // let sender = state.states[&senderAddr];
+                                // // println!("2311");
+                                // let repient = state.states[&recipientAddr];
+                                // // println!("232");
+                                // state.insert(senderAddr,(sender.1)-value, (sender.0)+1);
+                                // state.insert(recipientAddr,(repient.1)+value, repient.0);
+                                validTransaction.push(signedTransaction);
+                            }
+                        }
+                    }
+                    
+                    
+                    for vt in validTransaction {
+                        let public_key = &vt.public_key;
+                        let transaction = &vt.transaction;
+                        let recipientAddr = transaction.recipientAddr;
+                        let senderAddr: H160 = public_key[..].into();
+                        let value = transaction.value;
+                        let sender = state.states[&senderAddr];
+                        let repient = state.states[&recipientAddr];
+                        state.insert(senderAddr,(sender.1)-value, (sender.0)+1);
+                        state.insert(recipientAddr,(repient.1)+value, repient.0);
+                        info!("{:} received {:?} coins from {:}", 
+                            recipientAddr,
+                            value,
+                            senderAddr,
+                        );
+                    }
+                    // for (key, val) in state.states.iter() {
+                    //     info!("Address: {} has balance: {}, nonce: {}", key, val.1, val.0);
+                    // }
+                    for txpointer in tp.clone() {
+                        state.txBlockOrderedList.push(txpointer);
+                    }
+
+                    (*spb).insert(block.hash(),&state);
+                    (*blockchain).insert(&block);
+                    
+                    let mut v = vec![];
+                    v.push(block.hash());
+                    self.server.broadcast(Message::NewPrBlockHashes(v));
+                    // counter += 1;
+                    // let encoded_block: Vec<u8> = bincode::serialize(&block).unwrap();
+                    // println!("!!!!!!!!!!!!!!!I did it! Counter: {:?}, Block size is: {:?}, Block contains {:?} transactions", counter, encoded_block.len(), transactions_num);
+                    println!("Attacking!!!!!!!!");
+                    info!("Fake Pr block succeed !!");
+                }
+
+            }
+            
 
             if let OperatingState::Run(i) = self.operating_state {
                 if i != 0 {

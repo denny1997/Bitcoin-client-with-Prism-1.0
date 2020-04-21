@@ -89,7 +89,7 @@ impl Context {
         thread::sleep(duration);
         println!("Start Generator");
         loop {
-            let duration = time::Duration::from_millis(2000);
+            let duration = time::Duration::from_millis(500);
             thread::sleep(duration);
             // println!("I'm running!");
             
@@ -137,7 +137,7 @@ impl Context {
             // }
             let mut value = 0;
             if self.attacker == 1{
-                value = 1000;
+                value = 2000;
             }
             else{
                 value = rng.gen_range(0,cmp::min(10,currentBalance)) as u32;

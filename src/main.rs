@@ -120,9 +120,9 @@ fn main() {
     );
     worker_ctx.start();
 
-
+    let attack = matches.value_of("attack").unwrap().parse::<usize>().unwrap();
     if Some("1") == matches.value_of("generate") {
-        let attack = matches.value_of("attack").unwrap().parse::<usize>().unwrap();
+        
         // start the transaction generator
         let generator = generator::new(
             1,
@@ -138,7 +138,7 @@ fn main() {
 
     // start the miner
     let (miner_ctx, miner) = miner::new(
-        &server, &blockchain, &mempool, &txBlockmempool, &txBlockOrderedList, &spb,
+        &server, &blockchain, &mempool, &txBlockmempool, &txBlockOrderedList, &spb, attack,
     );
     miner_ctx.start();
 

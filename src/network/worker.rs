@@ -493,6 +493,9 @@ impl Context {
                                     }
                                 }                           
                             }
+                        }
+                        else{
+                            println!("Detect attack block!!!!");
                         }                       
                     }
 
